@@ -24459,7 +24459,7 @@ EOF
 
   pdfrw = callPackage ../development/python-modules/pdfrw { };
 
-  pytest_helpers_namespace = callPackage ../development/python-modules/pytest_helpers_namespace { };
+  pytest-helpers-namespace = callPackage ../development/python-modules/pytest_helpers_namespace { };
 
   ruffus = callPackage ../development/python-modules/ruffus { };
 

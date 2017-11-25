@@ -1,4 +1,4 @@
-{ stdenv, lib, buildPythonPackage, fetchPypi, isPyPy, python3, callPackage }:
+{ stdenv, lib, buildPythonPackage, fetchPypi, isPyPy, python3 }:
 
 with python3.pkgs;
 
@@ -20,7 +20,7 @@ buildPythonPackage rec {
   meta = with stdenv.lib; {
     homepage = https://gitlab.mister-muffin.de/josch/img2pdf;
     description = "Losslessly convert raster images to PDF. ";
-    license = lib.licenses.lgpl;
+    license = lib.licenses.lgpl3;
     maintainers = with lib.maintainers; [ hyper_ch ];
   };
 }

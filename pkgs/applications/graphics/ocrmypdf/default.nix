@@ -1,4 +1,4 @@
-{ lib, fetchFromGitHub, python3, callPackage, pytest, unpaper, ghostscript, tesseract, qpdf, glibcLocales }:
+{ lib, fetchFromGitHub, python3, unpaper, ghostscript, tesseract, qpdf, glibcLocales }:
 
 with python3.pkgs;
 
