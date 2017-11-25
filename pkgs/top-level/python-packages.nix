@@ -24454,6 +24454,15 @@ EOF
   parse-type = callPackage ../development/python-modules/parse-type { };
 
   ephem = callPackage ../development/python-modules/ephem { };
+  
+  img2pdf = callPackage ../development/python-modules/img2pdf { };
+
+  pdfrw = callPackage ../development/python-modules/pdfrw { };
+
+  pytest_helpers_namespace = callPackage ../development/python-modules/pytest_helpers_namespace { };
+
+  ruffus = callPackage ../development/python-modules/ruffus { };
+
 });
 
 in fix' (extends overrides packages)

@@ -15909,6 +15909,8 @@ with pkgs;
 
   notion = callPackage ../applications/window-managers/notion { };
 
+  ocrmypdf = callPackage ../applications/graphics/ocrmypdf { };
+
   openshift = callPackage ../applications/networking/cluster/openshift { };
 
   oroborus = callPackage ../applications/window-managers/oroborus {};
