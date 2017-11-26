@@ -1,6 +1,24 @@
-{ lib, fetchFromGitHub, python3, unpaper, ghostscript, tesseract, qpdf, glibcLocales }:
-
-with python3.pkgs;
+{ lib
+, buildPythonApplication
+, fetchFromGitHub
+, unpaper
+, ghostscript
+, tesseract
+, qpdf
+, glibcLocales
+, pytest
+, pytest_xdist
+, pytestcov
+, setuptools_scm
+, pytest-helpers-namespace
+, pytestrunner
+, ruffus
+, pillow
+, reportlab
+, pypdf2
+, img2pdf
+, cffi
+}:
 
 buildPythonApplication rec {
   version = "5.4.3";
@@ -33,7 +51,7 @@ buildPythonApplication rec {
   buildInputs = [ pytest pytest_xdist pytestcov setuptools_scm pytest-helpers-namespace pytestrunner glibcLocales ];
 
   doCheck = false;
-  
+
   propagatedBuildInputs = [
     ruffus
     pillow

@@ -1,6 +1,11 @@
-{ stdenv, lib, buildPythonPackage, fetchPypi, isPyPy, python3 }:
-
-with python3.pkgs;
+{ stdenv
+, lib
+, buildPythonPackage
+, fetchPypi
+, isPyPy
+, pillow
+, pdfrw
+}:
 
 buildPythonPackage rec {
   pname = "img2pdf";

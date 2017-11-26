@@ -10078,7 +10078,7 @@ with pkgs;
 
   olm = callPackage ../development/libraries/olm { };
 
-  oneko = callPackage ../applications/misc/oneko { };   
+  oneko = callPackage ../applications/misc/oneko { };
 
   oniguruma = callPackage ../development/libraries/oniguruma { };
 
@@ -15909,7 +15909,7 @@ with pkgs;
 
   notion = callPackage ../applications/window-managers/notion { };
 
-  ocrmypdf = callPackage ../applications/graphics/ocrmypdf { };
+  ocrmypdf = python3Packages.callPackage ../applications/graphics/ocrmypdf { };
 
   openshift = callPackage ../applications/networking/cluster/openshift { };
 

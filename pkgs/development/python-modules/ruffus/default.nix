@@ -1,4 +1,9 @@
-{ stdenv, lib, buildPythonPackage, fetchPypi, isPyPy, python3 }:
+{ stdenv
+, lib
+, buildPythonPackage
+, fetchPypi
+, isPyPy
+}:
 
 buildPythonPackage rec {
   pname = "ruffus";

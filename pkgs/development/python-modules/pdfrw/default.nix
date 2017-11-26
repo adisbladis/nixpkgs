@@ -1,6 +1,15 @@
-{ stdenv, lib, buildPythonPackage, fetchFromGitHub, fetchPypi, isPyPy, python3, pytest, zlib }:
-
-with python3.pkgs;
+{ stdenv
+, lib
+, buildPythonPackage
+, fetchFromGitHub
+, fetchPypi
+, isPyPy
+, pytest
+, unittest2
+, reportlab
+, pycrypto
+, zlib
+}:
 
 buildPythonPackage rec {
   pname = "pdfrw";
@@ -34,7 +43,7 @@ buildPythonPackage rec {
   '';
 
   checkInputs = [ unittest2 ];
-  
+
   checkPhase = ''
     # Copy over the test pdfs and stuff to the building directory
     cp -r $static_pdfs/* "./tests/static_pdfs"

@@ -1,6 +1,10 @@
-{ stdenv, lib, buildPythonPackage, fetchPypi, isPyPy, python3, pytest }:
-
-with python3.pkgs;
+{ stdenv
+, lib
+, buildPythonPackage
+, fetchPypi
+, isPyPy
+, pytest
+}:
 
 buildPythonPackage rec {
   pname = "pytest-helpers-namespace";
