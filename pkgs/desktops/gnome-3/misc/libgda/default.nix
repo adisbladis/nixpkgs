@@ -1,4 +1,10 @@
-{ stdenv, fetchurl, fetchpatch, pkgconfig, intltool, itstool, libxml2, gtk3, openssl }:
+{ stdenv, fetchurl, fetchpatch, pkgconfig, intltool, itstool, libxml2, gtk3, openssl
+, mysqlSupport ? false, mysql ? null
+, postgresSupport ? false, postgresql ? null
+}:
+
+assert mysqlSupport -> mysql != null;
+assert postgresSupport -> postgresql != null;
 
 stdenv.mkDerivation rec {
   inherit (import ./src.nix fetchurl) name src;
@@ -11,16 +17,23 @@ stdenv.mkDerivation rec {
     })
   ];
 
-  configureFlags = [
-    "--enable-gi-system-install=no"
+  NIX_CFLAGS_COMPILE = stdenv.lib.optionals mysqlSupport [
+    "-L${mysql.connector-c}/lib/mysql"
+    "-I${mysql.connector-c}/include/mysql"
   ];
+
+  configureFlags = with stdenv.lib; [ "--enable-gi-system-install=no" ]
+    ++ (optional (mysqlSupport) "--with-mysql=yes")
+    ++ (optional (postgresSupport) "--with-postgres=yes");
 
   enableParallelBuilding = true;
 
   hardeningDisable = [ "format" ];
 
   nativeBuildInputs = [ pkgconfig ];
-  buildInputs = [ intltool itstool libxml2 gtk3 openssl ];
+  buildInputs = with stdenv.lib; [ intltool itstool libxml2 gtk3 openssl ]
+    ++ optional (mysqlSupport) mysql
+    ++ optional (postgresSupport) postgresql;
 
   meta = with stdenv.lib; {
     description = "Database access library";
