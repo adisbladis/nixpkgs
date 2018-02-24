@@ -20701,6 +20701,11 @@ with pkgs;
 
   iterm2 = callPackage ../applications/misc/iterm2 {};
 
+  sequeler = callPackage ../applications/misc/sequeler {
+    libgee = libgee_0_8;
+    inherit (gnome3) gtksourceview libgda;
+  };
+
   sequelpro = callPackage ../applications/misc/sequelpro {};
 
   maphosts = callPackage ../tools/networking/maphosts {};
