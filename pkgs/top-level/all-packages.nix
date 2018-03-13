@@ -6668,6 +6668,8 @@ with pkgs;
 
   opam = callPackage ../development/tools/ocaml/opam { };
 
+  overmind = callPackage ../applications/misc/overmind { };
+
   picat = callPackage ../development/compilers/picat {
     stdenv = overrideCC stdenv gcc49;
   };
