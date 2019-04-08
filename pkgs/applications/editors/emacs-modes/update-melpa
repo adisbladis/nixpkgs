@@ -1,0 +1,6 @@
+#! /usr/bin/env nix-shell
+#! nix-shell --pure -i sh -p git nix nix-prefetch-git nix-prefetch-hg "with import ../../../.. {}; emacsWithPackages (epkgs: with epkgs.melpaPackages; [ promise ])"
+
+exec emacs --fg-daemon=updater --quick -l update-melpa.el -f run-updater "$@"
+
+# exec emacs update-melpa.el "$@"
