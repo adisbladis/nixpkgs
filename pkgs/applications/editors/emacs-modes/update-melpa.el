@@ -385,7 +385,6 @@ return Promise to resolve in that process."
                    (promise-then sha256p
                                  (lambda (sha256)
                                    (message "Indexed Recipe %s %s %s" recipe commit sha256)
-                                   (kill-buffer "*Messages*")
                                    (cons recipe (cons commit sha256))))))))
             recipes))
    (lambda (rcp-commits)
@@ -431,6 +430,8 @@ return Promise to resolve in that process."
 (defvar archivep)
 
 (defun run-updater ()
+  (message "Turning off logging to *Message* buffer")
+  (setq message-log-max nil)
   (setenv "GIT_ASKPASS")
   (setenv "SSH_ASKPASS")
   (setq process-adaptive-read-buffering nil)
@@ -451,7 +452,7 @@ return Promise to resolve in that process."
                                ;; Adjust for core count + 2
                                (make-semaphore 6 "local-indexer")
                                repo "origin/master"
-                               ; (seq-take recipe-names 20)
+                               ;; (seq-take recipe-names 20)
                                recipe-names)))
             (lambda (res)
               (message "Indexed Recipes: %d" (hash-table-count res))
