@@ -323,7 +323,7 @@ return Promise to resolve in that process."
 
 (defun http-get (url parser)
   (promise-new
-   (lambda (resolve _)
+   (lambda (resolve reject)
      (url-retrieve
       url (lambda (status)
             (funcall resolve (condition-case err
