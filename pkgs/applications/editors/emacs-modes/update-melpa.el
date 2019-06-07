@@ -3,6 +3,7 @@
 ;; This is the updater for recipes-archive-melpa.json
 
 (require 'promise)
+(require 'semaphore-promise)
 (require 'url)
 (require 'json)
 (require 'cl)
@@ -24,134 +25,16 @@
      (assq-delete-all
       key alist))))
 
-;; ## Monkey Patch finally, see https://github.com/chuntaro/emacs-promise/pull/6
-
-(cl-defmethod promise-finally ((this promise-class) f)
-  (promise-then this
-                (lambda (value)
-                  (promise-then (promise-resolve (funcall f))
-                                (lambda (_) value)))
-                (lambda (err)
-                  (promise-then (promise-resolve (funcall f))
-                                (lambda (_) (promise-reject err))))))
-
-(defun log-promise (p)
-  (promise-new
-   (lambda (resolve reject)
-     (promise-then
-      p
-      (lambda (res) (message "Result: %s" res) (funcall resolve res))
-      (lambda (err) (message "Error: %s" err) (funcall reject err))))))
-
-;; ## Semaphore implmentation
-
-;; This is used to control parallelism in fetcher and indexer
-
-(defclass semaphore ()
-  ((-name :initarg :name)
-   (-available :initarg :available)
-   (-acquired :initform 0)
-   (-released :initform 0)
-   (-mutex :type mutex)
-   (-cvar :type condition-variable)))
-
-(cl-defmethod initialize-instance :after ((inst semaphore) &rest args)
-  (with-slots (-name) inst
-    (let ((mutex (make-mutex -name)))
-      (oset inst -mutex mutex)
-      (oset inst -cvar (make-condition-variable mutex -name)))))
-
-(defun make-semaphore (count &optional name)
-  (make-instance 'semaphore
-                 :name name
-                 :available count))
-
-(cl-defmethod semaphore-acquire ((this semaphore))
-  (with-slots (-available -mutex -cvar) this
-    (with-mutex -mutex
-      (while (with-slots (-acquired -released) this
-               (>= -acquired (+ -available -released)))
-        (condition-wait -cvar))
-      (with-slots (-acquired) this
-        (oset this -acquired (+ 1 -acquired))))))
-
-(cl-defmethod semaphore-release ((this semaphore))
-  (with-slots (-available -mutex -cvar) this
-    (with-mutex -mutex
-      (condition-notify -cvar)
-      (with-slots (-released) this
-        (oset this -released (+ 1 -released))))))
-
-;; ## Resolve handler on separate thread
-
-(defun thread-promise (f &rest args)
-  (promise-new
-   (lambda (resolve reject)
-     (make-thread
-      (lambda ()
-        (condition-case ex
-            (funcall resolve (apply f args))
-          (error (funcall reject ex))))))))
-
-;; ## Resolve handler, gated by semaphore
-
-(defun promise-new-pipelined (semaphore handler)
-  (if semaphore
-      (promise-finally
-       (promise-new
-        (lambda (resolve reject)
-          (semaphore-acquire semaphore)
-          (funcall handler resolve reject)))
-       (lambda ()
-         (semaphore-release semaphore)))
-    (promise-new handler)))
-
-;; ## Promise the output of process
-
-(defun maybe-message (msg)
-  (when (not (string-empty-p msg))
-    (message msg)))
 
 (defun process-promise (semaphore program &rest args)
   "Generate an asynchronous process and
 return Promise to resolve in that process."
-  (promise-new-pipelined
-   semaphore
-   (lambda (resolve reject)
-     (let* ((stdout (generate-new-buffer (concat "*" program "-stdout*")))
-            (stderr (generate-new-buffer (concat "*" program "-stderr*")))
-            (stderr-pipe (make-pipe-process
-                          :name (concat "*" program "-stderr-pipe*")
-                          :noquery t
-                          :filter (lambda (_ output)
-                                    (with-current-buffer stderr
-                                      (insert output))))))
-       (condition-case err
-           (make-process :name program
-                         :buffer stdout
-                         :command (cons program args)
-                         :stderr stderr-pipe
-                         :sentinel (lambda (process event)
-                                     (unwind-protect
-                                         (let ((stderr-str (with-current-buffer stderr
-                                                             (string-trim-right (buffer-string))))
-                                               (stdout-str (with-current-buffer stdout
-                                                             (string-trim-right (buffer-string)))))
-                                           (if (string= event "finished\n")
-                                               (progn
-                                                 (maybe-message stderr-str)
-                                                 (funcall resolve stdout-str))
-                                             (progn
-                                               (maybe-message stdout-str)
-                                               (maybe-message stderr-str)
-                                               (funcall reject (list event stderr-str)))))
-                                       (delete-process stderr-pipe)
-                                       (kill-buffer stdout)
-                                       (kill-buffer stderr))))
-         (error (delete-process stderr-pipe)
-                (kill-buffer stdout)
-                (kill-buffer stderr)
-                (signal (car err) (cdr err))))))))
+  (promise-then
+   (semaphore-promise-gated
+    semaphore
+    (lambda (resolve reject)
+      (funcall resolve (apply #'promise:make-process program args))))
+   #'car))
 
 ;; ## Shell promise + env
 
@@ -167,8 +50,11 @@ return Promise to resolve in that process."
     process-environment))
 
 (defun shell-promise (semaphore env script)
-  (let ((process-environment env))
-    (process-promise semaphore shell-file-name shell-command-switch script)))
+  (semaphore-promise-gated
+   semaphore
+   (lambda (resolve reject)
+     (let ((process-environment env))
+       (funcall resolve (promise:make-shell-command script))))))
 
 ;; # Updater
 
@@ -399,7 +285,7 @@ return Promise to resolve in that process."
     (promise-finally
      (promise-then
       (shell-promise
-       (make-semaphore 2)
+       (semaphore-create 1 "dummy")
        (assocenv process-environment "MELPA_DIR" tmpdir)
        "cd $MELPA_DIR
        (git init --bare
@@ -446,14 +332,14 @@ return Promise to resolve in that process."
             (promise-then
              (list-recipes repo "origin/master")
              (lambda (recipe-names)
-               (thread-promise 'index-recipe-commits
-                               ;; The indexer runs on a local git repository,
-                               ;; so it is CPU bound.
-                               ;; Adjust for core count + 2
-                               (make-semaphore 6 "local-indexer")
-                               repo "origin/master"
-                               ;; (seq-take recipe-names 20)
-                               recipe-names)))
+               (promise:make-thread #'index-recipe-commits
+                                    ;; The indexer runs on a local git repository,
+                                    ;; so it is CPU bound.
+                                    ;; Adjust for core count + 2
+                                    (semaphore-create 6 "local-indexer")
+                                    repo "origin/master"
+                                    ;; (seq-take recipe-names 20)
+                                    recipe-names)))
             (lambda (res)
               (message "Indexed Recipes: %d" (hash-table-count res))
               (defvar recipe-index res)
@@ -482,11 +368,11 @@ return Promise to resolve in that process."
                          (seq-let [recipes-content archive-content] resolved
                            ;; The prefetcher is network bound, so 64 seems a good estimate
                            ;; for parallel network connections
-                           (thread-promise 'emit-json (make-semaphore 64 "prefetch-pool")
-                                           recipe-indexp
-                                           recipes-content
-                                           archive-content
-                                           (parse-previous-archive "recipes-archive-melpa.json")))))
+                           (promise:make-thread #'emit-json (semaphore-create 64 "prefetch-pool")
+                                                recipe-indexp
+                                                recipes-content
+                                                archive-content
+                                                (parse-previous-archive "recipes-archive-melpa.json")))))
          (lambda (buf)
            (with-current-buffer buf
              (write-file "recipes-archive-melpa.json")))
