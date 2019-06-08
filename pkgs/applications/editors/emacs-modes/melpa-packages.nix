@@ -18,11 +18,12 @@ To update the list of packages from MELPA,
 self:
 
   let
-    fetcherGenerators = { sha256
-                        , commit ? null
-                        , repo ? null
+    fetcherGenerators = { repo ? null
                         , url ? null
-                        , ... }: {
+                        , ... }:
+                        { sha256
+                        , commit
+                        , ...}: {
       github = self.callPackage ({ fetchFromGitHub }:
         fetchFromGitHub {
           owner = lib.head (lib.splitString "/" repo);
@@ -59,11 +60,11 @@ self:
         }
       ) {};
     };
-    generatedDerivation = { ename, version, fetcher
+    generatedDerivation = source:
+                          { ename, version, fetcher
                           , commit ? null
                           , sha256 ? null
                           , error ? null
-                          , recipeCommit ? null, recipeSha256 ? null
                           , deps ? null, url ? null
                           , ... }@args:
       lib.nameValuePair ename (
@@ -71,19 +72,20 @@ self:
           melpaBuild {
             pname = ename; # todo: sanitize
             ename = ename;
-            version = if isNull version then "" else lib.concatStringsSep "." (map toString version);
-            src = if isNull sha256 then
-              null else lib.getAttr fetcher (fetcherGenerators args);
-            recipe = if isNull recipeCommit then
-              null else fetchurl {
+            version = if isNull version then "" else
+              lib.concatStringsSep "." (map toString version);
+            src = if isNull sha256 then null else
+              lib.getAttr fetcher (fetcherGenerators args args."${source}");
+            recipe = if isNull commit then null else
+              fetchurl {
                 name = ename + "-recipe";
-                url = "https://raw.githubusercontent.com/melpa/melpa/${recipeCommit}/recipes/${ename}";
-                sha256 = recipeSha256;
-            };
+                url = "https://raw.githubusercontent.com/melpa/melpa/${commit}/recipes/${ename}";
+                inherit sha256;
+              };
             packageRequires = lib.optional (! isNull deps)
               (map (dep: pkgargs."${dep}" or self."${dep}" or null)
                    deps);
-            meta = {            # 
+            meta = {
               broken = ! isNull error;
               reasonBroken = error;
               homepage = url;
@@ -92,7 +94,7 @@ self:
           }
         ) {}
       );
-    imported = lib.listToAttrs (map generatedDerivation (lib.importJSON ./recipes-archive-melpa.json));
+    imported = lib.listToAttrs (map (generatedDerivation "unstable") (lib.importJSON ./recipes-archive-melpa.json));
     super = builtins.removeAttrs imported [
       "swbuff-x" # required dependency swbuff is missing
     ];

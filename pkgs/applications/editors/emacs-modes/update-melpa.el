@@ -36,6 +36,11 @@ return Promise to resolve in that process."
       (funcall resolve (apply #'promise:make-process program args))))
    #'car))
 
+(defun mangle-name (s)
+  (if (string-match "^[a-zA-Z].*" s)
+      s
+    (concat "_" s)))
+
 ;; ## Shell promise + env
 
 (defun as-string (o)
@@ -60,14 +65,14 @@ return Promise to resolve in that process."
 
 ;; ## Previous Archive Reader
 
-(defun previous-commit (index ename)
-  (when index
-    (when-let (desc (gethash ename index))
+(defun previous-commit (index ename variant)
+  (when-let (pdesc (and index (gethash ename index)))
+    (when-let (desc (and pdesc (gethash variant pdesc)))
       (gethash 'commit desc))))
 
-(defun previous-sha256 (index ename)
-  (when index
-    (when-let (desc (gethash ename index))
+(defun previous-sha256 (index ename variant)
+  (when-let (pdesc (and index (gethash ename index)))
+    (when-let (desc (and pdesc (gethash variant pdesc)))
       (gethash 'sha256 desc))))
 
 (defun parse-previous-archive (filename)
@@ -86,16 +91,14 @@ return Promise to resolve in that process."
 ;; (defun latest-git-revision (url)
 ;;   (process-promise "git" "ls-remote" url))
 
-(defun prefetch (semaphore fetcher name repo commit)
+(defun prefetch (semaphore fetcher repo commit)
   (promise-then
    (apply 'process-promise
           semaphore
           (pcase fetcher
             ("github"    (list "nix-prefetch-url"
-                               "--name"   name
                                "--unpack" (concat "https://github.com/" repo "/archive/" commit ".tar.gz")))
             ("gitlab"    (list "nix-prefetch-url"
-                               "--name"   name
                                "--unpack" (concat "https://gitlab.com/" repo "/repository/archive.tar.gz?ref=" commit)))
             ("bitbucket" (list "nix-prefetch-hg"
                                (concat "https://bitbucket.com/" repo) commit))
@@ -111,19 +114,20 @@ return Promise to resolve in that process."
        ("git" (alist-get 'sha256 (json-read-from-string res)))
        (_ (car (split-string res)))))))
 
-(defun append-fetched-info (info recipe-index-promise ename sha256)
+(defun append-fetched-info (info unstable-info recipe-index-promise ename sha256)
   (promise-then
    recipe-index-promise
    (lambda (idx)
      (if-let (desc (gethash ename idx))
          (destructuring-bind (rcp-commit . rcp-sha256) desc
-           (append `((sha256  . ,sha256)
-                     (recipeCommit . ,rcp-commit)
-                     (recipeSha256 . ,rcp-sha256))
-                   info))
-       (append `((sha256  . ,sha256)
-                 (error . "No recipe info"))
-               info)))))
+           (append info
+                   `((commit . ,rcp-commit)
+                     (sha256 . ,rcp-sha256)
+                     (unstable . ,(append unstable-info
+                                          `((sha256  . ,sha256)))))))
+       (append info
+               `((error . "No recipe info")
+                 (unstable . ((sha256  . ,sha256)))))))))
 
 (defun start-fetch (semaphore recipe-index-promise recipes archive previous)
   (promise-all
@@ -137,47 +141,48 @@ return Promise to resolve in that process."
 
                     (fetcher (alist-get 'fetcher eprops))
                     (repo    (alist-get 'repo eprops))
-
-                    (base-result `((ename   . ,ename)
-                                   (version . ,version)
-                                   (fetcher . ,fetcher)
-                                   (repo    . ,repo))))
+                    (url     (and aprops (or (gethash 'url aprops)
+                                             (alist-get 'url eprops))))
+                    (info (append `((ename   . ,ename)
+                                    (version . ,version)
+                                    (fetcher . ,fetcher))
+                                  (if (or (equal "github" fetcher)
+                                          (equal "gitlab" fetcher))
+                                      `((repo . ,repo))
+                                    (and url `((url . ,url)))))))
                (if aprops
-                   (let* ((url     (or (gethash 'url aprops)
-                                       (alist-get 'url eprops)))
-                          (deps    (when-let (deps (gethash 'deps aentry))
+                   (let* ((deps    (when-let (deps (gethash 'deps aentry))
                                      (remove 'emacs (hash-table-keys deps))))
                           (commit  (gethash 'commit aprops))
-                          (prev-commit (previous-commit previous ename))
-                          (prev-sha256 (previous-sha256 previous ename))
-                          
-                          (archive-result (append base-result
-                                                  `((url     . ,url)
-                                                    (commit  . ,commit)
-                                                    (deps    . ,(sort deps 'string<))))))
+                          (prev-commit (previous-commit previous ename 'unstable))
+                          (prev-sha256 (previous-sha256 previous ename 'unstable))
+                          (unstable-info (append `((commit . ,commit))
+                                                 (when (< 0 (length deps))
+                                                   `((deps . ,(sort deps 'string<)))))))
                      (if (and commit prev-sha256
                               (equal prev-commit commit))
                          (progn
                            (message "INFO: %s: re-using %s %s" ename prev-commit prev-sha256)
-                           (append-fetched-info archive-result recipe-index-promise ename prev-sha256))
+                           (append-fetched-info info unstable-info recipe-index-promise ename prev-sha256))
                        (if (and commit (or repo url))
                            (promise-then
-                            (prefetch semaphore fetcher ename (or repo url) commit)
+                            (prefetch semaphore fetcher (or repo url) commit)
                             (lambda (sha256)
                               (message "INFO: %s: prefetched repository %s %s" ename commit sha256)
-                              (append-fetched-info archive-result recipe-index-promise ename sha256))
+                              (append-fetched-info info unstable-info recipe-index-promise ename sha256))
                             (lambda (err)
                               (message "ERROR: %s: during prefetch %s" ename err)
-                              (cons `(error . ,err)
-                                    archive-result)))
+                              (append `((error . ,err)
+                                        (unstable . ,unstable-info))
+                                      info)))
                          (progn
                            (message "ERROR: %s: no commit information" ename)
                            (promise-resolve (cons `(error . "No commit information")
-                                                  archive-result))))))
+                                                  info))))))
                  (progn
                    (message "ERROR: %s: not in archive" ename)
                    (promise-resolve (cons `(error . "Not in archive")
-                                          base-result))))))
+                                          info))))))
            recipes)))
 
 ;; ## Emitter

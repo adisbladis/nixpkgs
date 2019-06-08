@@ -1,5 +1,5 @@
 with import ../../../.. {};
-(emacsPackagesNgGen emacs26).
+(emacsPackagesNgFor emacs26).
 emacsWithPackages (epkgs: let
   promise = epkgs.trivialBuild {
     pname = "promise";
@@ -24,4 +24,4 @@ emacsWithPackages (epkgs: let
       
     };
   };
-  in [ promise semaphore ])
+  in [ promise semaphore ] ++ (with epkgs.melpaPackages; [ smex rainbow-delimiters paredit ]))
