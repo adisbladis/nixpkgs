@@ -114,95 +114,110 @@ return Promise to resolve in that process."
        ("git" (alist-get 'sha256 (json-read-from-string res)))
        (_ (car (split-string res)))))))
 
-(defun source-info (semaphore recipe archive previous variant)
-  (let* ((esym    (car recipe))
-         (ename   (symbol-name esym))
-         (eprops  (cdr recipe))
-         (aentry  (gethash esym archive))
-         (aprops  (and aentry (gethash 'props aentry)))
-         (fetcher (alist-get 'fetcher eprops))
-         (repo    (alist-get 'repo eprops))
-         (url     (and aprops (or (gethash 'url aprops)
-                                  (alist-get 'url eprops))))
-
-         (deps    (when-let (deps (gethash 'deps aentry))
-                    (remove 'emacs (hash-table-keys deps))))
+(defun source-sha (semaphore ename eprops aprops previous variant)
+  (let* ((fetcher (alist-get 'fetcher eprops))
          (commit  (gethash 'commit aprops))
          (prev-commit (previous-commit previous ename variant))
          (prev-sha256 (previous-sha256 previous ename variant))
-         (source-info (append (when (< 0 (length deps))
-                                `((deps . ,(sort deps 'string<))))
-                              `((commit . ,commit)))))
+         (repo    (alist-get 'repo eprops))
+         (url     (or (and aprops (gethash 'url aprops))
+                      (alist-get 'url eprops))))
     (if (and commit prev-sha256
              (equal prev-commit commit))
         (progn
           (message "INFO: %s: re-using %s %s" ename prev-commit prev-sha256)
-          (promise-resolve
-           (append source-info
-                   `((sha256 . ,prev-sha256)))))
+          (promise-resolve `((sha256 . ,prev-sha256))))
       (if (and commit (or repo url))
           (promise-then
            (prefetch semaphore fetcher (or repo url) commit)
            (lambda (sha256)
              (message "INFO: %s: prefetched repository %s %s" ename commit sha256)
-             (append source-info
-                     `((sha256 . ,sha256))))
+             `((sha256 . ,sha256)))
            (lambda (err)
              (message "ERROR: %s: during prefetch %s" ename err)
-             (append source-info
-                     `((error . ,err)))))
+             (promise-resolve
+              `((error . ,err)))))
         (progn
           (message "ERROR: %s: no commit information" ename)
           (promise-resolve
-           (append source-info
-                   `((error . "No commit information")))))))))
+           `((error . "No commit information"))))))))
 
-(defun start-fetch (semaphore recipe-index-promise recipes archive previous)
+(defun source-info (recipe archive source-sha)
+  (let* ((esym    (car recipe))
+         (ename   (symbol-name esym))
+         (eprops  (cdr recipe))
+         (fetcher (alist-get 'fetcher eprops))
+         (repo    (alist-get 'repo eprops))
+         (aentry  (gethash esym archive))
+         (version (and aentry (gethash 'ver aentry)))
+         (deps    (when-let (deps (gethash 'deps aentry))
+                    (remove 'emacs (hash-table-keys deps))))
+         (aprops  (and aentry (gethash 'props aentry)))
+         (url     (or (and aprops (gethash 'url aprops))
+                      (alist-get 'url eprops)))
+         (commit  (gethash 'commit aprops)))
+    (append `((version . ,version))
+            (when (< 0 (length deps))
+              `((deps . ,(sort deps 'string<))))
+            (fetcher . ,fetcher)
+            (if (or (equal "github" fetcher)
+                    (equal "gitlab" fetcher))
+                `((repo . ,repo))
+              `((url . ,url)))
+            `((commit . ,commit))
+            source-sha)))
+
+(defun recipe-info (recipe-index ename)
+  (if-let (desc (gethash ename recipe-index))
+      (destructuring-bind (rcp-commit . rcp-sha256) desc
+        `((commit . ,rcp-commit)
+          (sha256 . ,rcp-sha256)))
+    `((error . "No recipe info"))))
+
+(defun start-fetch (semaphore recipe-index-promise recipes unstable-archive stable-archive previous)
   (promise-all
    (mapcar (lambda (entry)
              (let* ((esym    (car entry))
                     (ename   (symbol-name esym))
                     (eprops  (cdr entry))
-                    (aentry  (gethash esym archive))
-                    (aprops  (and aentry (gethash 'props aentry)))
-                    (version (and aentry (gethash 'ver aentry)))
-
-                    (fetcher (alist-get 'fetcher eprops))
-                    (repo    (alist-get 'repo eprops))
-                    (url     (and aprops (or (gethash 'url aprops)
-                                             (alist-get 'url eprops))))
-                    (info (append `((ename   . ,ename)
-                                    (version . ,version)
-                                    (fetcher . ,fetcher))
-                                  (if (or (equal "github" fetcher)
-                                          (equal "gitlab" fetcher))
-                                      `((repo . ,repo))
-                                    `((url . ,url))))))
-               (if aprops
-                   (promise-then
-                    (source-info semaphore entry archive previous 'unstable)
-                    (lambda (unstable-source-info)
-                      (promise-then
-                       recipe-index-promise
-                       (lambda (idx)
-                         (if-let (desc (gethash ename idx))
-                             (destructuring-bind (rcp-commit . rcp-sha256) desc
-                               (append info
-                                       `((commit . ,rcp-commit)
-                                         (sha256 . ,rcp-sha256)
-                                         (unstable . ,unstable-source-info))))
-                           (append info
-                                   `((error . "No recipe info")
-                                     (unstable . ,unstable-source-info))))))))
-                 (progn
-                   (message "ERROR: %s: not in archive" ename)
-                   (promise-resolve (cons `(error . "Not in archive")
-                                          info))))))
+                    
+                    (unstable-aentry  (gethash esym unstable-archive))
+                    (unstable-aprops  (and unstable-aentry (gethash 'props unstable-aentry)))
+                    (unstable-commit  (and unstable-aprops (gethash 'commit unstable-aprops)))
+                    
+                    (stable-aentry (gethash esym stable-archive))
+                    (stable-aprops (and stable-aentry (gethash 'props stable-aentry)))
+                    (stable-commit  (and stable-aprops (gethash 'commit stable-aprops)))
+                    
+                    (unstable-shap (if unstable-aprops
+                                       (source-sha semaphore ename eprops unstable-aprops previous 'unstable)
+                                     (promise-resolve nil)))
+                    (stable-shap (if (equal unstable-commit stable-commit)
+                                     unstable-shap
+                                   (if stable-aprops
+                                       (source-sha semaphore ename eprops stable-aprops previous 'stable)
+                                     (promise-resolve nil)))))
+               
+               (promise-then
+                (promise-all (list recipe-index-promise unstable-shap stable-shap))
+                (lambda (res)
+                  (seq-let [recipe-index unstable-sha stable-sha] res
+                    (append `((ename   . ,ename))
+                            (if-let (desc (gethash ename recipe-index))
+                                (destructuring-bind (rcp-commit . rcp-sha256) desc
+                                  (append `((commit . ,rcp-commit)
+                                            (sha256 . ,rcp-sha256))
+                                          (when (not unstable-aprops)
+                                            (message "ERROR: %s: not in archive" ename)
+                                            `((error . "Not in archive")))))
+                              `((error . "No recipe info")))
+                            (when unstable-aprops `((unstable . ,(source-info entry unstable-archive unstable-sha))))
+                            (when stable-aprops `((stable . ,(source-info entry stable-archive stable-sha))))))))))
            recipes)))
 
 ;; ## Emitter
 
-(defun emit-json (prefetch-semaphore recipe-index-promise recipes archive previous)
+(defun emit-json (prefetch-semaphore recipe-index-promise recipes archive stable-archive previous)
   (promise-then
    (start-fetch
     prefetch-semaphore
@@ -211,7 +226,7 @@ return Promise to resolve in that process."
                     (string-lessp
                      (symbol-name (car a))
                      (symbol-name (car b)))))
-    archive
+    archive stable-archive
     previous)
    (lambda (descriptors)
      (message "Finished downloading %d descriptors" (length descriptors))
@@ -382,16 +397,23 @@ return Promise to resolve in that process."
                                           (let ((json-object-type 'hash-table)
                                                 (json-array-type 'list)
                                                 (json-key-type 'symbol))
+                                            (json-read))))
+                              (http-get "https://stable.melpa.org/archive.json"
+                                        (lambda ()
+                                          (let ((json-object-type 'hash-table)
+                                                (json-array-type 'list)
+                                                (json-key-type 'symbol))
                                             (json-read))))))
                        (lambda (resolved)
                          (message "Finished download")
-                         (seq-let [recipes-content archive-content] resolved
+                         (seq-let [recipes-content archive-content stable-archive-content] resolved
                            ;; The prefetcher is network bound, so 64 seems a good estimate
                            ;; for parallel network connections
                            (promise:make-thread #'emit-json (semaphore-create 64 "prefetch-pool")
                                                 recipe-indexp
                                                 recipes-content
                                                 archive-content
+                                                stable-archive-content
                                                 (parse-previous-archive "recipes-archive-melpa.json")))))
          (lambda (buf)
            (with-current-buffer buf
