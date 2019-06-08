@@ -13,13 +13,14 @@ To update the list of packages from MELPA,
 
 */
 
-{ external }:
+{ lib, external }:
 
 self:
 
   let
-    imported = import ./melpa-stable-generated.nix { inherit (self) callPackage; };
-
+    inherit (import ./libgenerated.nix lib self) melpaDerivation;
+    imported = lib.listToAttrs (map (melpaDerivation "stable")
+                                    (lib.importJSON ./recipes-archive-melpa.json));
     super = imported;
 
     dontConfigure = pkg: pkg.override (args: {

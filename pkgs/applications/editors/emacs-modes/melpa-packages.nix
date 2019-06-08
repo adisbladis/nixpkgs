@@ -18,83 +18,9 @@ To update the list of packages from MELPA,
 self:
 
   let
-    fetcherGenerators = { repo ? null
-                        , url ? null
-                        , ... }:
-                        { sha256
-                        , commit
-                        , ...}: {
-      github = self.callPackage ({ fetchFromGitHub }:
-        fetchFromGitHub {
-          owner = lib.head (lib.splitString "/" repo);
-          repo = lib.head (lib.tail (lib.splitString "/" repo));
-          rev = commit;
-          inherit sha256;
-        }
-      ) {};
-      gitlab = self.callPackage ({ fetchFromGitLab }:
-        fetchFromGitLab {
-          owner = lib.head (lib.splitString "/" repo);
-          repo = lib.head (lib.tail (lib.splitString "/" repo));
-          rev = commit;
-          inherit sha256;
-        }
-      ) {};
-      git = self.callPackage ({ fetchgit }:
-        fetchgit {
-          rev = commit;
-          inherit sha256 url;
-        }
-      ) {};
-      bitbucket = self.callPackage ({ fetchhg }:
-        fetchhg {
-          rev = commit;
-          url = "https://bitbucket.com/${repo}";
-          inherit sha256;
-        }
-      ) {};
-      hg = self.callPackage ({ fetchhg }:
-        fetchhg {
-          rev = commit;
-          inherit sha256 url;
-        }
-      ) {};
-    };
-    generatedDerivation = source:
-                          { ename, version, fetcher
-                          , commit ? null
-                          , sha256 ? null
-                          , error ? null
-                          , deps ? null, url ? null
-                          , ... }@args:
-      lib.nameValuePair ename (
-        self.callPackage ({ melpaBuild, fetchurl, ... }@pkgargs:
-          melpaBuild {
-            pname = ename; # todo: sanitize
-            ename = ename;
-            version = if isNull version then "" else
-              lib.concatStringsSep "." (map toString version);
-            src = if isNull sha256 then null else
-              lib.getAttr fetcher (fetcherGenerators args args."${source}");
-            recipe = if isNull commit then null else
-              fetchurl {
-                name = ename + "-recipe";
-                url = "https://raw.githubusercontent.com/melpa/melpa/${commit}/recipes/${ename}";
-                inherit sha256;
-              };
-            packageRequires = lib.optional (! isNull deps)
-              (map (dep: pkgargs."${dep}" or self."${dep}" or null)
-                   deps);
-            meta = {
-              broken = ! isNull error;
-              reasonBroken = error;
-              homepage = url;
-              license = lib.licenses.free;
-            };
-          }
-        ) {}
-      );
-    imported = lib.listToAttrs (map (generatedDerivation "unstable") (lib.importJSON ./recipes-archive-melpa.json));
+    inherit (import ./libgenerated.nix lib self) melpaDerivation;
+    imported = lib.listToAttrs (map (melpaDerivation "unstable")
+                                    (lib.importJSON ./recipes-archive-melpa.json));
     super = builtins.removeAttrs imported [
       "swbuff-x" # required dependency swbuff is missing
     ];

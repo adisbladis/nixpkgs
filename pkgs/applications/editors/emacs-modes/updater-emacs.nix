@@ -24,4 +24,6 @@ emacsWithPackages (epkgs: let
       
     };
   };
-  in [ promise semaphore ] ++ (with epkgs.melpaPackages; [ smex rainbow-delimiters paredit ]))
+  in [ promise semaphore ]
+     #  ++ (with epkgs.melpaPackages; [ smex rainbow-delimiters paredit ])
+)
