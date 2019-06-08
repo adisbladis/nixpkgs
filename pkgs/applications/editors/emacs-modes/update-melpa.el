@@ -114,20 +114,48 @@ return Promise to resolve in that process."
        ("git" (alist-get 'sha256 (json-read-from-string res)))
        (_ (car (split-string res)))))))
 
-(defun append-fetched-info (info unstable-info recipe-index-promise ename sha256)
-  (promise-then
-   recipe-index-promise
-   (lambda (idx)
-     (if-let (desc (gethash ename idx))
-         (destructuring-bind (rcp-commit . rcp-sha256) desc
-           (append info
-                   `((commit . ,rcp-commit)
-                     (sha256 . ,rcp-sha256)
-                     (unstable . ,(append unstable-info
-                                          `((sha256  . ,sha256)))))))
-       (append info
-               `((error . "No recipe info")
-                 (unstable . ((sha256  . ,sha256)))))))))
+(defun source-info (semaphore recipe archive previous variant)
+  (let* ((esym    (car recipe))
+         (ename   (symbol-name esym))
+         (eprops  (cdr recipe))
+         (aentry  (gethash esym archive))
+         (aprops  (and aentry (gethash 'props aentry)))
+         (fetcher (alist-get 'fetcher eprops))
+         (repo    (alist-get 'repo eprops))
+         (url     (and aprops (or (gethash 'url aprops)
+                                  (alist-get 'url eprops))))
+
+         (deps    (when-let (deps (gethash 'deps aentry))
+                    (remove 'emacs (hash-table-keys deps))))
+         (commit  (gethash 'commit aprops))
+         (prev-commit (previous-commit previous ename variant))
+         (prev-sha256 (previous-sha256 previous ename variant))
+         (source-info (append (when (< 0 (length deps))
+                                `((deps . ,(sort deps 'string<))))
+                              `((commit . ,commit)))))
+    (if (and commit prev-sha256
+             (equal prev-commit commit))
+        (progn
+          (message "INFO: %s: re-using %s %s" ename prev-commit prev-sha256)
+          (promise-resolve
+           (append source-info
+                   `((sha256 . ,prev-sha256)))))
+      (if (and commit (or repo url))
+          (promise-then
+           (prefetch semaphore fetcher (or repo url) commit)
+           (lambda (sha256)
+             (message "INFO: %s: prefetched repository %s %s" ename commit sha256)
+             (append source-info
+                     `((sha256 . ,sha256))))
+           (lambda (err)
+             (message "ERROR: %s: during prefetch %s" ename err)
+             (append source-info
+                     `((error . ,err)))))
+        (progn
+          (message "ERROR: %s: no commit information" ename)
+          (promise-resolve
+           (append source-info
+                   `((error . "No commit information")))))))))
 
 (defun start-fetch (semaphore recipe-index-promise recipes archive previous)
   (promise-all
@@ -149,36 +177,23 @@ return Promise to resolve in that process."
                                   (if (or (equal "github" fetcher)
                                           (equal "gitlab" fetcher))
                                       `((repo . ,repo))
-                                    (and url `((url . ,url)))))))
+                                    `((url . ,url))))))
                (if aprops
-                   (let* ((deps    (when-let (deps (gethash 'deps aentry))
-                                     (remove 'emacs (hash-table-keys deps))))
-                          (commit  (gethash 'commit aprops))
-                          (prev-commit (previous-commit previous ename 'unstable))
-                          (prev-sha256 (previous-sha256 previous ename 'unstable))
-                          (unstable-info (append `((commit . ,commit))
-                                                 (when (< 0 (length deps))
-                                                   `((deps . ,(sort deps 'string<)))))))
-                     (if (and commit prev-sha256
-                              (equal prev-commit commit))
-                         (progn
-                           (message "INFO: %s: re-using %s %s" ename prev-commit prev-sha256)
-                           (append-fetched-info info unstable-info recipe-index-promise ename prev-sha256))
-                       (if (and commit (or repo url))
-                           (promise-then
-                            (prefetch semaphore fetcher (or repo url) commit)
-                            (lambda (sha256)
-                              (message "INFO: %s: prefetched repository %s %s" ename commit sha256)
-                              (append-fetched-info info unstable-info recipe-index-promise ename sha256))
-                            (lambda (err)
-                              (message "ERROR: %s: during prefetch %s" ename err)
-                              (append `((error . ,err)
-                                        (unstable . ,unstable-info))
-                                      info)))
-                         (progn
-                           (message "ERROR: %s: no commit information" ename)
-                           (promise-resolve (cons `(error . "No commit information")
-                                                  info))))))
+                   (promise-then
+                    (source-info semaphore entry archive previous 'unstable)
+                    (lambda (unstable-source-info)
+                      (promise-then
+                       recipe-index-promise
+                       (lambda (idx)
+                         (if-let (desc (gethash ename idx))
+                             (destructuring-bind (rcp-commit . rcp-sha256) desc
+                               (append info
+                                       `((commit . ,rcp-commit)
+                                         (sha256 . ,rcp-sha256)
+                                         (unstable . ,unstable-source-info))))
+                           (append info
+                                   `((error . "No recipe info")
+                                     (unstable . ,unstable-source-info))))))))
                  (progn
                    (message "ERROR: %s: not in archive" ename)
                    (promise-resolve (cons `(error . "Not in archive")
@@ -326,7 +341,7 @@ return Promise to resolve in that process."
   (setenv "GIT_ASKPASS")
   (setenv "SSH_ASKPASS")
   (setq process-adaptive-read-buffering nil)
-  
+
   ;; Indexer and Prefetcher run in parallel
 
   ;; Recipe Indexer
@@ -383,7 +398,7 @@ return Promise to resolve in that process."
              (write-file "recipes-archive-melpa.json")))
          (lambda (err)
            (message "ERROR: %s" err))))
-  
+
   ;; Shutdown routine
   (make-thread
    (lambda ()
@@ -394,6 +409,5 @@ return Promise to resolve in that process."
                         ;;         (when (not (eq thr (current-thread)))
                         ;;           (thread-join thr)))
                         ;;       (all-threads))
-                        
-                        (kill-emacs 0))))))
 
+                        (kill-emacs 0))))))
