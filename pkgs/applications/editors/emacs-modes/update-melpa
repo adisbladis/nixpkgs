@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell --show-trace --pure -i sh -p git nix nix-prefetch-git nix-prefetch-hg "import ./updater-emacs.nix"
+#! nix-shell --show-trace -i sh -p git nix nix-prefetch-git nix-prefetch-hg "import ./updater-emacs.nix"
 
 # "with import ../../../.. {}; emacsWithPackages (epkgs: with epkgs.melpaPackages; [ promise semaphore ])"
 
