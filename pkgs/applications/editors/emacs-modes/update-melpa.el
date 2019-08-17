@@ -372,7 +372,7 @@ return Promise to resolve in that process."
                                     ;; Adjust for core count + 2
                                     (semaphore-create 6 "local-indexer")
                                     repo "origin/master"
-                                    ;; (seq-take recipe-names 20)
+                                    (seq-take recipe-names 20)
                                     recipe-names)))
             (lambda (res)
               (message "Indexed Recipes: %d" (hash-table-count res))
