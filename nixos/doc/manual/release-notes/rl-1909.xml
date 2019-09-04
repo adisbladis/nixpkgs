@@ -115,6 +115,11 @@
      <listitem><para><option>services.avahi.enable</option></para></listitem>
     </itemizedlist>
    </listitem>
+   <listitem>
+    <para>
+      Go now defaults to 1.13, updated from 1.11.
+    </para>
+   </listitem>
   </itemizedlist>
  </section>
 
