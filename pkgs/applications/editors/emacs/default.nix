@@ -33,6 +33,7 @@ stdenv.mkDerivation rec {
   name = "emacs-${version}${versionModifier}";
   version = "26.3";
   versionModifier = "";
+  appName = "Emacs";            # used by Darwin systems in emacs/wrapper.nix
 
   src = fetchurl {
     url = "mirror://gnu/emacs/${name}.tar.xz";
