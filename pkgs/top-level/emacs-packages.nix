@@ -73,6 +73,9 @@ in lib.makeScope newScope (self: lib.makeOverridable ({
   , melpaPackages ? mkMelpaPackages self
   , orgPackages ? mkOrgPackages self
   , manualPackages ? mkManualPackages self
+  # Make the darwin app bundle name configurable
+  # This allows for installing multiple Emacs environments side by side
+  , darwinAppName ? "Emacs"
 }: ({}
   // elpaPackages // { inherit elpaPackages; }
   // melpaStablePackages // { inherit melpaStablePackages; }
@@ -81,6 +84,6 @@ in lib.makeScope newScope (self: lib.makeOverridable ({
   // manualPackages
   // {
     inherit emacs melpaBuild trivialBuild;
-    emacsWithPackages = emacsWithPackages self;
+    emacsWithPackages = emacsWithPackages { inherit self darwinAppName; };
   })
 ) {})

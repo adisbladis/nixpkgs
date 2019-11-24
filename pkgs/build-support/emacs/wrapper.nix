@@ -32,7 +32,7 @@ in customEmacsPackages.emacsWithPackages (epkgs: [ epkgs.evil epkgs.magit ])
 
 */
 
-{ lib, lndir, makeWrapper, runCommand }: self:
+{ lib, lndir, makeWrapper, runCommand }: { self, darwinAppName }:
 
 with lib; let inherit (self) emacs; in
 
@@ -41,10 +41,9 @@ packagesFun: # packages explicitly requested by the user
 let
   explicitRequires =
     if lib.isFunction packagesFun
-      then packagesFun self
+    then packagesFun self
     else packagesFun;
 
-  appName = emacs.appName or "Emacs";
 in
 
 runCommand
@@ -164,13 +163,13 @@ runCommand
     # Wrap MacOS app
     # this has to pick up resources and metadata
     # to recognize it as an "app"
-    if [ -d "$emacs/Applications/${appName}.app" ]; then
-      mkdir -p $out/Applications/${appName}.app/Contents/MacOS
-      cp -r $emacs/Applications/${appName}.app/Contents/Info.plist \
-            $emacs/Applications/${appName}.app/Contents/PkgInfo \
-            $emacs/Applications/${appName}.app/Contents/Resources \
-            $out/Applications/${appName}.app/Contents
-      makeWrapper $emacs/Applications/${appName}.app/Contents/MacOS/${appName} $out/Applications/${appName}.app/Contents/MacOS/${appName} \
+    if [ -d "$emacs/Applications/${darwinAppName}.app" ]; then
+      mkdir -p $out/Applications/${darwinAppName}.app/Contents/MacOS
+      cp -r $emacs/Applications/${darwinAppName}.app/Contents/Info.plist \
+            $emacs/Applications/${darwinAppName}.app/Contents/PkgInfo \
+            $emacs/Applications/${darwinAppName}.app/Contents/Resources \
+            $out/Applications/${darwinAppName}.app/Contents
+      makeWrapper $emacs/Applications/${darwinAppName}.app/Contents/MacOS/${darwinAppName} $out/Applications/${darwinAppName}.app/Contents/MacOS/${darwinAppName} \
         --suffix EMACSLOADPATH ":" "$deps/share/emacs/site-lisp:"
     fi
 
