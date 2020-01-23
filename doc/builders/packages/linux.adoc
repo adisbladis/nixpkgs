@@ -1,0 +1,42 @@
+
+[[_sec_linux_kernel]]
+= Linux kernel
+
+
+The Nix expressions to build the Linux kernel are in https://github.com/NixOS/nixpkgs/blob/master/pkgs/os-specific/linux/kernel[pkgs/os-specific/linux/kernel]. 
+
+The function that builds the kernel has an argument [var]``kernelPatches`` which should be a list of `{name, patch, extraConfig}` attribute sets, where [var]``name`` is the name of the patch (which is included in the kernel`'s [var]``meta.description`` attribute), [var]``patch`` is the patch itself (possibly compressed), and [var]``extraConfig`` (optional) is a string specifying extra options to be concatenated to the kernel configuration file ([path]``.config``
+). 
+
+The kernel derivation exports an attribute [var]``features`` specifying whether optional functionality is or isn`'t enabled.
+This is used in NixOS to implement kernel-specific behaviour.
+For instance, if the kernel has the [var]``iwlwifi`` feature (i.e.
+has built-in support for Intel wireless chipsets), then NixOS doesn`'t have to build the external [var]``iwlwifi`` package: 
+[source]
+----
+
+modulesTree = [kernel]
+  ++ pkgs.lib.optional (!kernel.features ? iwlwifi) kernelPackages.iwlwifi
+  ++ ...;
+----
+
+How to add a new (major) version of the Linux kernel to Nixpkgs: 
+
+. Copy the old Nix expression (e.g. [path]``linux-2.6.21.nix`` ) to the new one (e.g. [path]``linux-2.6.22.nix`` ) and update it. 
+. Add the new kernel to [path]``all-packages.nix`` (e.g., create an attribute [var]``kernel_2_6_22``). 
+. Now we`'re going to update the kernel configuration. First unpack the kernel. Then for each supported platform (``i686``, ``x86_64``, ``uml``) do the following: 
++
+.. Make an copy from the old config (e.g. [path]``config-2.6.21-i686-smp`` ) to the new one (e.g. [path]``config-2.6.22-i686-smp`` ). 
+.. Copy the config file for this platform (e.g. [path]``config-2.6.22-i686-smp`` ) to [path]``.config`` in the kernel source tree. 
+.. Run `make oldconfig ARCH=[replaceable]``{i386,x86_64,um}``` and answer all questions. (For the uml configuration, also add ``SHELL=bash``.) Make sure to keep the configuration consistent between platforms (i.e. don`'t enable some feature on `i686` and disable it on ``x86_64``). 
+.. If needed you can also run ``make menuconfig``: 
++
+----
+
+$ nix-env -i ncurses
+$ export NIX_CFLAGS_LINK=-lncurses
+$ make menuconfig ARCH=`arch`
+----
+.. Copy [path]``.config`` over the new config file (e.g. [path]``config-2.6.22-i686-smp`` ). 
+. Test building the kernel: ``nix-build -A kernel_2_6_22``. If it compiles, ship it! For extra credit, try booting NixOS with it. 
+. It may be that the new kernel requires updating the external kernel modules and kernel-dependent packages listed in the [var]``linuxPackagesFor`` function in [path]``all-packages.nix`` (such as the NVIDIA drivers, AUFS, etc.). If the updated packages aren`'t backwards compatible with older kernels, you may need to keep the older versions around. 

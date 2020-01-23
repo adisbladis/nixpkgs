@@ -1,0 +1,62 @@
+[[_ch_profiles]]
+= Profiles
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+In some cases, it may be desirable to take advantage of commonly-used, predefined configurations provided by nixpkgs, but different from those that come as default.
+This is a role fulfilled by NixOS's Profiles, which come as files living in [path]``<nixpkgs/nixos/modules/profiles>``
+.
+That is to say, expected usage is to add them to the imports list of your [path]``/etc/configuration.nix``
+ as such: 
+
+[source]
+----
+
+  imports = [
+   <nixpkgs/nixos/modules/profiles/profile-name.nix>
+  ];
+----
+
+
+Even if some of these profiles seem only useful in the context of install media, many are actually intended to be used in real installs. 
+
+What follows is a brief explanation on the purpose and use-case for each profile.
+Detailing each option configured by each one is out of scope. 
+
+include::profiles/all-hardware.adoc[leveloffset=1]
+
+
+include::profiles/base.adoc[leveloffset=1]
+
+
+include::profiles/clone-config.adoc[leveloffset=1]
+
+
+include::profiles/demo.adoc[leveloffset=1]
+
+
+include::profiles/docker-container.adoc[leveloffset=1]
+
+
+include::profiles/graphical.adoc[leveloffset=1]
+
+
+include::profiles/hardened.adoc[leveloffset=1]
+
+
+include::profiles/headless.adoc[leveloffset=1]
+
+
+include::profiles/installation-device.adoc[leveloffset=1]
+
+
+include::profiles/minimal.adoc[leveloffset=1]
+
+
+include::profiles/qemu-guest.adoc[leveloffset=1]

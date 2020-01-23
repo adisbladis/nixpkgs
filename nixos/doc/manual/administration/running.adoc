@@ -1,0 +1,32 @@
+[[_ch_running]]
+= Administration
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+include::service-mgmt.adoc[leveloffset=1]
+
+
+include::rebooting.adoc[leveloffset=1]
+
+
+include::user-sessions.adoc[leveloffset=1]
+
+
+include::control-groups.adoc[leveloffset=1]
+
+
+include::logging.adoc[leveloffset=1]
+
+
+include::cleaning-store.adoc[leveloffset=1]
+
+
+include::containers.adoc[leveloffset=1]
+
+
+include::troubleshooting.adoc[leveloffset=1]

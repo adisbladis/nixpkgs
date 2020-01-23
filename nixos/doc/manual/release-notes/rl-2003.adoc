@@ -1,0 +1,205 @@
+
+[[_sec_release_20.03]]
+= Release 20.03 ("`Markhor`", 2020.03/??)
+
+[[_sec_release_20.03_highlights]]
+== Highlights
+
+
+In addition to numerous new and upgraded packages, this release has the following highlights: 
+
+* Support is planned until the end of October 2020, handing over to 20.09. 
+* Linux kernel is updated to branch 5.4 by default (from 4.19). Users of Intel GPUs may prefer to explicitly set branch to 4.19 to avoid some regressions. 
++
+[source]
+----
+boot.kernelPackages = pkgs.linuxPackages_4_19;
+----
+* Postgresql for NixOS service now defaults to v11. 
+* The graphical installer image starts the graphical session automatically. Before you'd be greeted by a tty and asked to enter [command]``systemctl start display-manager``. It is now possible to disable the display-manager from running by selecting the `Disable display-manager` quirk in the boot menu. 
+* By default zfs pools will now be trimmed on a weekly basis. Trimming is only done on supported devices (i.e. NVME or SSDs) and should improve throughput and lifetime of these devices. It is controlled by the [var]``services.zfs.trim.enable`` varname. The zfs scrub service ([var]``services.zfs.autoScrub.enable``) and the zfs autosnapshot service ([var]``services.zfs.autoSnapshot.enable``) are now only enabled if zfs is set in [var]``config.boot.initrd.supportedFilesystems`` or [var]``config.boot.supportedFilesystems``. These lists will automatically contain zfs as soon as any zfs mountpoint is configured in [var]``fileSystems``. 
+* [command]``nixos-option`` has been rewritten in C++, speeding it up, improving correctness, and adding a [option]``-r`` option which prints all options and their values recursively. 
+* [option]``services.xserver.desktopManager.default`` and [option]``services.xserver.windowManager.default`` options were replaced by a single <<_opt_services.xserver.displaymanager.defaultsession>> option to improve support for upstream session files. If you used something like: 
++
+[source]
+----
+
+services.xserver.desktopManager.default = "xfce";
+services.xserver.windowManager.default = "icewm";
+----
+
+you should change it to: 
+[source]
+----
+
+services.xserver.displayManager.defaultSession = "xfce+icewm";
+----
+
+
+[[_sec_release_20.03_new_services]]
+== New Services
+
+
+The following new services were added since the last release: 
+
+* The kubernetes kube-proxy now supports a new hostname configuration `services.kubernetes.proxy.hostname` which has to be set if the hostname of the node should be non default. 
+* UPower's configuration is now managed by NixOS and can be customized via [option]``services.upower``. 
+* To use Geary you should enable <<_opt_programs.geary.enable>> instead of just adding it to <<_opt_environment.systempackages>>. It was created so Geary could function properly outside of GNOME. 
+
+
+[[_sec_release_20.03_incompatibilities]]
+== Backward Incompatibilities
+
+
+When upgrading from a previous release, please be aware of the following incompatible changes: 
+
+* GnuPG is now built without support for a graphical passphrase entry by default. Please enable the `gpg-agent` user service via the NixOS option ``programs.gnupg.agent.enable``. Note that upstream recommends using `gpg-agent` and will spawn a `gpg-agent` on the first invocation of GnuPG anyway. 
+* The `dynamicHosts` option has been removed from the <<_opt_networking.networkmanager.enable,NetworkManager>> module. Allowing (multiple) regular users to override host entries affecting the whole system opens up a huge attack vector. There seem to be very rare cases where this might be useful. Consider setting system-wide host entries using <<_opt_networking.hosts,networking.hosts>>, provide them via the DNS server in your network, or use <<_opt_environment.etc,environment.etc>> to add a file into `/etc/NetworkManager/dnsmasq.d` reconfiguring ``hostsdir``. 
+* The `99-main.network` file was removed. Maching all network interfaces caused many breakages, see https://github.com/NixOS/nixpkgs/pull/18962[#18962] and https://github.com/NixOS/nixpkgs/pull/71106[#71106]. 
++ 
+We already don't support the global <<_opt_networking.usedhcp,networking.useDHCP>>, <<_opt_networking.defaultgateway,networking.defaultGateway>> and <<_opt_networking.defaultgateway6,networking.defaultGateway6>> options if <<_opt_networking.usenetworkd,networking.useNetworkd>> is enabled, but direct users to configure the per-device <<_opt_networking.interfaces,networking.interfaces.<name>....>> options. 
+* The stdenv now runs all bash with ``set -u``, to catch the use of undefined variables. Before, it itself used `set -u` but was careful to unset it so other packages' code ran as before. Now, all bash code is held to the same high standard, and the rather complex stateful manipulation of the options can be discarded. 
+* The SLIM Display Manager has been removed, as it has been unmaintained since 2013. Consider migrating to a different display manager such as LightDM (current default in NixOS), SDDM, GDM, or using the startx module which uses Xinitrc. 
+* The Way Cooler wayland compositor has been removed, as the project has been officially canceled. There are no more `way-cooler` attribute and `programs.way-cooler` options. 
+* The BEAM package set has been deleted. You will only find there the different interpreters. You should now use the different build tools coming with the languages with sandbox mode disabled. 
+* There is now only one Xfce package-set and module. This means attributes, `xfce4-14```xfce4-12``, and `xfceUnstable` all now point to the latest Xfce 4.14 packages. And in future NixOS releases will be the latest released version of Xfce available at the time during the releases development (if viable). 
+* The <<_opt_services.phpfpm.pools,phpfpm>> module now sets `PrivateTmp=true` in its systemd units for better process isolation. If you rely on `/tmp` being shared with other services, explicitly override this by setting `serviceConfig.PrivateTmp` to `false` for each phpfpm unit. 
+* KDE`'s old multimedia framework Phonon no longer supports Qt 4. For that reason, Plasma desktop also does not have [option]``enableQt4Support`` option any more. 
+* The BeeGFS module has been removed. 
+* The osquery module has been removed. 
+* Going forward, `~/bin` in the users home directory will no longer be in `PATH` by default. If you depend on this you should set the option `environment.homeBinInPath` to ``true``. The aforementioned option was added this release. 
+* The `buildRustCrate` infrastructure now produces `lib` outputs in addition to the `out` output. This has led to drastically reduced closed sizes for some rust crates since development dependencies are now in the `lib` output. 
+* Pango was upgraded to 1.44, which no longer uses freetype for font loading. This means that type1 and bitmap fonts are no longer supported in applications relying on Pango for font rendering (notably, GTK application). See https://gitlab.gnome.org/GNOME/pango/issues/386[ upstream issue] for more information. 
+* The `roundcube` module has been hardened. 
++
+** The password of the database is not written world readable in the store any more. If `database.host` is set to ``localhost``, then a unix user of the same name as the database will be created and PostreSQL peer authentication will be used, removing the need for a password. Otherwise, a password is still needed and can be provided with the new option ``database.passwordFile``, which should be set to the path of a file containing the password and readable by the user `nginx` only. The `database.password` option is insecure and deprecated. Usage of this option will print a warning. 
+** A random `des_key` is set by default in the configuration of roundcube, instead of using the hardcoded and insecure default. To ensure a clean migration, all users will be logged out when you upgrade to this release. 
+* The packages `openobex` and `obexftp` are no longer installed when enabling Bluetooth via [option]``hardware.bluetooth.enable``. 
+* The `dump1090` derivation has been changed to use FlightAware's dump1090 as its upstream. However, this version does not have an internal webserver anymore. The assets in the `share/dump1090` directory of the derivation can be used in conjunction with an external webserver to replace this functionality. 
+* The fourStore and fourStoreEndpoint modules have been removed. 
+* Polkit no longer has the user of uid 0 (root) as an admin identity. We now follow the upstream default of only having every member of the wheel group admin privileged. Before it was root and members of wheel. The positive outcome of this is pkexec GUI popups or terminal prompts will no longer require the user to choose between two essentially equivalent choices (whether to perform the action as themselves with wheel permissions, or as the root user). 
+* NixOS containers no longer build NixOS manual by default. This saves evaluation time, especially if there are many declarative containers defined. Note that this is already done when `<nixos/modules/profiles/minimal.nix>` module is included in container config. 
+* The `kresd` services deprecates the `interfaces` option in favor of the `listenPlain` option which requires full https://www.freedesktop.org/software/systemd/man/systemd.socket.html#ListenStream=[systemd.socket compatible] declaration which always include a port. 
+* Virtual console options have been reorganized and can be found under a single top-level attribute: ``console``. The full set of changes is as follows: 
+** `i18n.consoleFont` renamed to <<_opt_console.font,console.font>>
+** `i18n.consoleKeyMap` renamed to <<_opt_console.keymap,console.keyMap>>
+** `i18n.consoleColors` renamed to <<_opt_console.colors,console.colors>>
+** `i18n.consolePackages` renamed to <<_opt_console.packages,console.packages>>
+** `i18n.consoleUseXkbConfig` renamed to <<_opt_console.usexkbconfig,console.useXkbConfig>>
+** `boot.earlyVconsoleSetup` renamed to <<_opt_console.earlysetup,console.earlySetup>>
+** `boot.extraTTYs` renamed to <<_opt_console.extrattys,console.extraTTYs>>
+* The <<_opt_services.awstats.enable,awstats>> module has been rewritten to serve stats via static html pages, updated on a timer, over <<_opt_services.nginx.virtualhosts,nginx>>, instead of dynamic cgi pages over <<_opt_services.httpd.enable,apache>>. 
++ 
+Minor changes will be required to migrate existing configurations.
+Details of the required changes can seen by looking through the <<_opt_services.awstats.enable,awstats>> module. 
+* The httpd module no longer provides options to support serving web content without defining a virtual host. As a result of this the <<_opt_services.httpd.logpervirtualhost,services.httpd.logPerVirtualHost>> option now defaults to `true` instead of ``false``. Please update your configuration to make use of <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts>>. 
++ 
+The <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>>> option has changed type from a list of submodules to an attribute set of submodules, better matching <<_opt_services.nginx.virtualhosts,services.nginx.virtualHosts.<name>>>. 
++ 
+This change comes with the addition of the following options which mimic the functionality of their `nginx` counterparts: <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>.addSSL>>, <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>.forceSSL>>, <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>.onlySSL>>, <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>.enableACME>>, <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>.acmeRoot>>, and <<_opt_services.httpd.virtualhosts,services.httpd.virtualHosts.<name>.useACMEHost>>. 
+* For NixOS configuration options, the `loaOf` type has been deprecated and will be removed in a future release. In nixpkgs, options of this type will be changed to `attrsOf` instead. If you were using one of these in your configuration, you will see a warning suggesting what changes will be required. 
++ 
+For example, <<_opt_users.users,users.users>> is a `loaOf` option that is commonly used as follows: 
++
+[source]
+----
+
+users.users =
+  [ { name = "me";
+      description = "My personal user.";
+      isNormalUser = true;
+    }
+  ];
+----
+
+This should be rewritten by removing the list and using the value of `name` as the name of the attribute set: 
+[source]
+----
+
+users.users.me =
+  { description = "My personal user.";
+    isNormalUser = true;
+  };
+----
++ 
+For more information on this change have look at these links: https://github.com/NixOS/nixpkgs/issues/1800[issue #1800], https://github.com/NixOS/nixpkgs/pull/63103[PR #63103]. 
+* For NixOS modules, the types `types.submodule` and `types.submoduleWith` now support paths as allowed values, similar to how `imports` supports paths. Because of this, if you have a module that defines an option of type ``either (submodule ...) path``, it will break since a path is now treated as the first type instead of the second. To fix this, change the type to ``either path (submodule ...)``. 
+* The <<_opt_services.buildkite_agents,Buildkite Agent>> module and corresponding packages have been updated to 3.x, and to support multiple instances of the agent running at the same time. This means you will have to rename `services.buildkite-agent` to ``services.buildkite-agents.<name>``. Furthermore, the following options have been changed: 
+** `services.buildkite-agent.meta-data` has been renamed to <<_opt_services.buildkite_agents,services.buildkite-agents.<name>.tags>>, to match upstreams naming for 3.x. Its type has also changed - it now accepts an attrset of strings. 
+** The``services.buildkite-agent.openssh.publicKeyPath`` option has been removed, as it's not necessary to deploy public keys to clone private repositories. 
+** `services.buildkite-agent.openssh.privateKeyPath` has been renamed to <<_opt_services.buildkite_agents,buildkite-agents.<name>.privateSshKeyPath>>, as the whole `openssh` now only contained that single option. 
+** <<_opt_services.buildkite_agents,services.buildkite-agents.<name>.shell>> has been introduced, allowing to specify a custom shell to be used. 
+* The `citrix_workspace_19_3_0` package has been removed as it will be EOLed within the lifespan of 20.03. For further information, please refer to the https://www.citrix.com/de-de/support/product-lifecycle/milestones/receiver.html[support and maintenance information] from upstream. 
+* The `gcc5` and `gfortran5` packages have been removed. 
+* The [option]``services.xserver.displayManager.auto`` module has been removed. It was only intended for use in internal NixOS tests, and gave the false impression of it being a special display manager when it's actually LightDM. Please use the <<_opt_services.xserver.displaymanager.lightdm.autologin>> options instead, or any other display manager in NixOS as they all support auto-login. If you used this module specifically because it permitted root auto-login you can override the lightdm-autologin pam module like: 
++
+[source]
+----
+
+security.pam.services.lightdm-autologin.text = lib.mkForce ''
+    auth     requisite pam_nologin.so
+    auth     required  pam_succeed_if.so quiet
+    auth     required  pam_permit.so
+
+    account  include   lightdm
+
+    password include   lightdm
+
+    session  include   lightdm
+'';
+----
+
+The difference is the: 
+[source]
+----
+
+auth required pam_succeed_if.so quiet
+----
+
+line, where default it's: 
+[source]
+----
+
+auth required pam_succeed_if.so uid >= 1000 quiet
+----
+
+not permitting users with uid's below 1000 (like root). All other display managers in NixOS are configured like this. 
+* There have been lots of improvements to the Mailman module. As a result, 
+** The [option]``services.mailman.hyperkittyBaseUrl`` option has been renamed to <<_opt_services.mailman.hyperkitty.baseurl>>. 
+** The [option]``services.mailman.hyperkittyApiKey`` option has been removed. This is because having an option for the Hyperkitty API key meant that the API key would be stored in the world-readable Nix store, which was a security vulnerability. A new Hyperkitty API key will be generated the first time the new Hyperkitty service is run, and it will then be persisted outside of the Nix store. To continue using Hyperkitty, you must set <<_opt_services.mailman.hyperkitty.enable>> to ``true``. 
+** Additionally, some Postfix configuration must now be set manually instead of automatically by the Mailman module: 
++
+[source]
+----
+
+ = [ "hash:/var/lib/mailman/data/postfix_domains" ];
+.transport_maps = [ "hash:/var/lib/mailman/data/postfix_lmtp" ];
+.local_recipient_maps = [ "hash:/var/lib/mailman/data/postfix_lmtp" ];
+----
+
+This is because some users may want to include other values in these lists as well, and this was not possible if they were set automatically by the Mailman module.
+It would not have been possible to just concatenate values from multiple modules each setting the values they needed, because the order of elements in the list is significant. 
+* The LLVM versions 3.5, 3.9 and 4 (including the corresponding CLang versions) have been dropped.
+* The [option]``networking.interfaces.*.preferTempAddress`` option has been replaced by [option]``networking.interfaces.*.tempAddress``. The new option allows better control of the IPv6 temporary addresses, including completely disabling them for interfaces where they are not needed. 
+* Rspamd was updated to version 2.2. Read https://rspamd.com/doc/migration.html#migration-to-rspamd-20[ the upstream migration notes] carefully. Please be especially aware that some modules were removed and the default Bayes backend is now Redis. 
+* The `\*psu` versions of [package]#oraclejdk8# have been removed as they aren't provided by upstream anymore. 
+* The [option]``services.dnscrypt-proxy`` module has been removed as it used the deprecated version of dnscrypt-proxy. We've added <<_opt_services.dnscrypt_proxy2.enable>> to use the supported version. 
+* `qesteidutil` has been deprecated in favor of ``qdigidoc``. 
+* [package]#sqldeveloper_18# has been removed as it's not maintained anymore, [package]#sqldeveloper# has been updated to version ``19.4``. Please note that this means that this means that the [package]#oraclejdk# is now required. For further information please read the https://www.oracle.com/technetwork/developer-tools/sql-developer/downloads/sqldev-relnotes-194-5908846.html[release notes]. 
+* The [package]#gcc-snapshot# -package has been removed. It's marked as broken for >2 years and used to point to a fairly old snapshot  from the [package]#gcc7# -branch. 
+* The  -script now uses the python test-driver. 
+* The [package]#riot-web# package now accepts configuration overrides as an attribute set instead of a string. A formerly used JSON configuration can be converted to an attribute set with ``builtins.fromJSON``. 
++ 
+The new default configuration also disables automatic guest account registration and analytics to improve privacy.
+The previous behavior can be restored by setting ``config.riot-web.conf = { disable_guests = false; piwik = true; }``. 
+
+
+[[_sec_release_20.03_notable_changes]]
+== Other Notable Changes
+
+* SD images are now compressed by default using ``bzip2``.
+* The nginx web server previously started its master process as root privileged, then ran worker processes as a less privileged identity user. This was changed to start all of nginx as a less privileged user (defined by `services.nginx.user` and ``services.nginx.group``). As a consequence, all files that are needed for nginx to run (included configuration fragments, SSL certificates and keys, etc.) must now be readable by this less privileged user/group. 
+* OpenSSH has been upgraded from 7.9 to 8.1, improving security and adding features but with potential incompatibilities. Consult the https://www.openssh.com/txt/release-8.1[ release announcement] for more information. 
+* `PRETTY_NAME` in `/etc/os-release` now uses the short rather than full version string. 
+* The ACME module has switched from simp-le to https://github.com/go-acme/lego[lego] which allows us to support DNS-01 challenges and wildcard certificates. The following options have been added: <<_opt_security.acme.acceptterms,security.acme.acceptTerms>>, <<_opt_security.acme.certs,security.acme.certs.<name>.dnsProvider>>, <<_opt_security.acme.certs,security.acme.certs.<name>.credentialsFile>>, <<_opt_security.acme.certs,security.acme.certs.<name>.dnsPropagationCheck>>. As well as this, the options `security.acme.acceptTerms` and either `security.acme.email` or `security.acme.certs.<name>.email` must be set in order to use the ACME module. Certificates will be regenerated anew on the next renewal date. The credentials for simp-le are preserved and thus it is possible to roll back to previous versions without breaking certificate generation. 
+* It is now possible to unlock LUKS-Encrypted file systems using a FIDO2 token via [option]``boot.initrd.luks.fido2Support``. 

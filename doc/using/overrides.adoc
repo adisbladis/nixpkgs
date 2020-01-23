@@ -1,0 +1,142 @@
+[[_chap_overrides]]
+= Overriding
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+Sometimes one wants to override parts of ``nixpkgs``, e.g.
+derivation attributes, the results of derivations. 
+
+These functions are used to make changes to packages, returning only single packages. link:#chap-overlays[Overlays], on the other hand, can be used to combine the overridden packages across the entire package set of Nixpkgs. 
+
+[[_sec_pkg_override]]
+== <pkg>.override
+
+
+The function [var]``override`` is usually available for all the derivations in the nixpkgs expression ([var]``pkgs``). 
+
+It is used to override the arguments passed to a function. 
+
+Example usages: 
+[source]
+----
+pkgs.foo.override { arg1 = val1; arg2 = val2; ... }
+----
+[source]
+----
+
+import pkgs.path { overlays = [ (self: super: {
+  foo = super.foo.override { barSupport = true ; };
+  })]};
+----
+[source]
+----
+
+mypkg = pkgs.callPackage ./mypkg.nix {
+  mydep = pkgs.mydep.override { ... };
+  }
+----
+
+In the first example, [var]``pkgs.foo`` is the result of a function call with some default arguments, usually a derivation.
+Using [var]``pkgs.foo.override`` will call the same function with the given new arguments. 
+
+[[_sec_pkg_overrideattrs]]
+== <pkg>.overrideAttrs
+
+
+The function [var]``overrideAttrs`` allows overriding the attribute set passed to a [var]``stdenv.mkDerivation`` call, producing a new derivation based on the original one.
+This function is available on all derivations produced by the [var]``stdenv.mkDerivation`` function, which is most packages in the nixpkgs expression [var]``pkgs``. 
+
+Example usage: 
+[source]
+----
+
+helloWithDebug = pkgs.hello.overrideAttrs (oldAttrs: rec {
+  separateDebugInfo = true;
+});
+----
+
+In the above example, the [var]``separateDebugInfo`` attribute is overridden to be true, thus building debug info for [var]``helloWithDebug``, while all other attributes will be retained from the original [var]``hello`` package. 
+
+The argument [var]``oldAttrs`` is conventionally used to refer to the attr set originally passed to [var]``stdenv.mkDerivation``. 
+
+[NOTE]
+====
+Note that [var]``separateDebugInfo`` is processed only by the [var]``stdenv.mkDerivation`` function, not the generated, raw Nix derivation.
+Thus, using [var]``overrideDerivation`` will not work in this case, as it overrides only the attributes of the final derivation.
+It is for this reason that [var]``overrideAttrs`` should be preferred in (almost) all cases to [var]``overrideDerivation``, i.e.
+to allow using [var]``stdenv.mkDerivation`` to process input arguments, as well as the fact that it is easier to use (you can use the same attribute names you see in your Nix code, instead of the ones generated (e.g. [var]``buildInputs`` vs [var]``nativeBuildInputs``), and it involves less typing). 
+====
+
+[[_sec_pkg_overridederivation]]
+== <pkg>.overrideDerivation
+
+[WARNING]
+====
+You should prefer [var]``overrideAttrs`` in almost all cases, see its documentation for the reasons why. [var]``overrideDerivation`` is not deprecated and will continue to work, but is less nice to use and does not have as many abilities as [var]``overrideAttrs``. 
+====
+
+[WARNING]
+====
+Do not use this function in Nixpkgs as it evaluates a Derivation before modifying it, which breaks package abstraction and removes error-checking of function arguments.
+In addition, this evaluation-per-function application incurs a performance penalty, which can become a problem if many overrides are used.
+It is only intended for ad-hoc customisation, such as in [path]``~/.config/nixpkgs/config.nix``
+. 
+====
+
+
+The function [var]``overrideDerivation`` creates a new derivation based on an existing one by overriding the original's attributes with the attribute set produced by the specified function.
+This function is available on all derivations defined using the [var]``makeOverridable`` function.
+Most standard derivation-producing functions, such as [var]``stdenv.mkDerivation``, are defined using this function, which means most packages in the nixpkgs expression, [var]``pkgs``, have this function. 
+
+Example usage: 
+[source]
+----
+
+mySed = pkgs.gnused.overrideDerivation (oldAttrs: {
+  name = "sed-4.2.2-pre";
+  src = fetchurl {
+    url = ftp://alpha.gnu.org/gnu/sed/sed-4.2.2-pre.tar.bz2;
+    sha256 = "11nq06d131y4wmf3drm0yk502d2xc6n5qy82cg88rb9nqd2lj41k";
+  };
+  patches = [];
+});
+----
+
+In the above example, the [var]``name``, [var]``src``, and [var]``patches`` of the derivation will be overridden, while all other attributes will be retained from the original derivation. 
+
+The argument [var]``oldAttrs`` is used to refer to the attribute set of the original derivation. 
+
+[NOTE]
+====
+A package's attributes are evaluated *before* being modified by the [var]``overrideDerivation`` function.
+For example, the [var]``name`` attribute reference in [var]``url = "mirror://gnu/hello/${name}.tar.gz";`` is filled-in *before* the [var]``overrideDerivation`` function modifies the attribute set.
+This means that overriding the [var]``name`` attribute, in this example, *will not* change the value of the [var]``url`` attribute.
+Instead, we need to override both the [var]``name`` *and* [var]``url`` attributes. 
+====
+
+[[_sec_lib_makeoverridable]]
+== lib.makeOverridable
+
+
+The function [var]``lib.makeOverridable`` is used to make the result of a function easily customizable.
+This utility only makes sense for functions that accept an argument set and return an attribute set. 
+
+Example usage: 
+[source]
+----
+
+f = { a, b }: { result = a+b; };
+c = lib.makeOverridable f { a = 1; b = 2; };
+----
+
+The variable [var]``c`` is the value of the [var]``f`` function applied with some default arguments.
+Hence the value of [var]``c.result`` is ``3``, in this example. 
+
+The variable [var]``c`` however also has some additional functions, like <<_sec_pkg_override,c.override>> which can be used to override the default arguments.
+In this example the value of [var]``(c.override { a = 4; }).result`` is 6. 

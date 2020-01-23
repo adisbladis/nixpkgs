@@ -1,0 +1,54 @@
+
+[[_sec_pkgs_ocitools]]
+= pkgs.ociTools
+
+[var]``pkgs.ociTools`` is a set of functions for creating containers according to the https://github.com/opencontainers/runtime-spec[OCI container specification v1.0.0].
+Beyond that it makes no assumptions about the container runner you choose to use to run the created container. 
+
+[[_ssec_pkgs_ocitools_buildcontainer]]
+== buildContainer
+
+
+This function creates a simple OCI container that runs a single command inside of it.
+An OCI container consists of a [var]``config.json`` and a rootfs directory.The nix store of the container will contain all referenced dependencies of the given command. 
+
+The parameters of [var]``buildContainer`` with an example value are described below: 
+
+[[_ex_ocitools_buildcontainer]]
+.Build Container
+====
+[source]
+----
+
+buildContainer {
+  args = [ (with pkgs; writeScript "run.sh" ''
+    #!${bash}/bin/bash
+    exec ${bash}/bin/bash
+  '').outPath ]; 
+
+  mounts = {
+    "/data" = {
+      type = "none";
+      source = "/var/lib/mydata";
+      options = [ "bind" ];
+    };
+  };
+
+  readonly = false; 
+}
+----
+
+      [var]``args``
+ specifies a set of arguments to run inside the container. This is the only required argument for [var]``buildContainer``
+. All referenced packages inside the derivation will be made available inside the container
+     
+
+      [var]``mounts``
+ specifies additional mount points chosen by the user. By default only a minimal set of necessary filesystems are mounted into the container (e.g procfs, cgroupfs)
+     
+
+      [var]``readonly``
+ makes the container's rootfs read-only if it is set to true. The default value is false ``false``
+.
+     
+====

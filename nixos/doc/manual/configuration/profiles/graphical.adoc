@@ -1,0 +1,9 @@
+[[_sec_profile_graphical]]
+= Graphical
+
+
+Defines a NixOS configuration with the Plasma 5 desktop.
+It's used by the graphical installation CD. 
+
+It sets <<_opt_services.xserver.enable>>, <<_opt_services.xserver.displaymanager.sddm.enable>>, <<_opt_services.xserver.desktopmanager.plasma5.enable>>, and <<_opt_services.xserver.libinput.enable>> to true.
+It also includes glxinfo and firefox in the system packages list. 

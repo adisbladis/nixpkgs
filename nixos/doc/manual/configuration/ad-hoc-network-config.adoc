@@ -1,0 +1,15 @@
+[[_ad_hoc_network_config]]
+= Ad-Hoc Configuration
+
+
+You can use <<_opt_networking.localcommands>> to specify shell commands to be run at the end of ``network-setup.service``.
+This is useful for doing network configuration not covered by the existing NixOS modules.
+For instance, to statically configure an IPv6 address: 
+[source]
+----
+
+ =
+  ''
+    ip -6 addr add 2001:610:685:1::1/64 dev eth0
+  '';
+----

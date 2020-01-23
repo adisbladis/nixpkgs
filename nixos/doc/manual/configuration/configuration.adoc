@@ -1,0 +1,44 @@
+[[_ch_configuration]]
+= Configuration
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+include::config-syntax.adoc[leveloffset=1]
+
+
+include::package-mgmt.adoc[leveloffset=1]
+
+
+include::user-mgmt.adoc[leveloffset=1]
+
+
+include::file-systems.adoc[leveloffset=1]
+
+
+include::x-windows.adoc[leveloffset=1]
+
+
+include::xfce.adoc[leveloffset=1]
+
+
+include::networking.adoc[leveloffset=1]
+
+
+include::linux-kernel.adoc[leveloffset=1]
+
+
+include::matrix.adoc[leveloffset=1]
+
+
+include::../generated/modules.adoc[leveloffset=1]
+
+
+include::profiles.adoc[leveloffset=1]
+
+
+include::kubernetes.adoc[leveloffset=1]

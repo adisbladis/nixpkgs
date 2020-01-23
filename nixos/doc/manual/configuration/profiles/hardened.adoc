@@ -1,0 +1,11 @@
+[[_sec_profile_hardened]]
+= Hardened
+
+
+A profile with most (vanilla) hardening options enabled by default, potentially at the cost of features and performance. 
+
+This includes a hardened kernel, and limiting the system information available to processes through the [path]``/sys``
+ and [path]``/proc``
+ filesystems.
+It also disables the User Namespaces feature of the kernel, which stops Nix from being able to build anything (this particular setting can be overriden via <<_opt_security.allowusernamespaces>>). See the `
+  profile source` for further detail on which settings are altered. 

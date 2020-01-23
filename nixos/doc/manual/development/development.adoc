@@ -1,0 +1,32 @@
+[[_ch_development]]
+= Development
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+include::sources.adoc[leveloffset=1]
+
+
+include::writing-modules.adoc[leveloffset=1]
+
+
+include::building-parts.adoc[leveloffset=1]
+
+
+include::writing-documentation.adoc[leveloffset=1]
+
+
+include::building-nixos.adoc[leveloffset=1]
+
+
+include::nixos-tests.adoc[leveloffset=1]
+
+
+include::testing-installer.adoc[leveloffset=1]
+
+
+include::releases.adoc[leveloffset=1]

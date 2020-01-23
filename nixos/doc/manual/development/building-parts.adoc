@@ -1,0 +1,80 @@
+[[_sec_building_parts]]
+= Building Specific Parts of NixOS
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+With the command [command]``nix-build``, you can build specific parts of your NixOS configuration.
+This is done as follows: 
+----
+
+$ cd`/path/to/nixpkgs/nixos`
+$ nix-build -A config.`option`
+----
+
+where [replaceable]``option`` is a NixOS option with type "`derivation`" (i.e.
+something that can be built). Attributes of interest include: 
+
+[var]``system.build.toplevel``::
+The top-level option that builds the entire NixOS system.
+Everything else in your configuration is indirectly pulled in by this option.
+This is what [command]``nixos-rebuild`` builds and what [path]``/run/current-system``
+points to afterwards. 
++
+A shortcut to build this is: 
++
+----
+
+$ nix-build -A system
+----
+
+[var]``system.build.manual.manualHTML``::
+The NixOS manual. 
+
+[var]``system.build.etc``::
+A tree of symlinks that form the static parts of [path]``/etc``
+. 
+
+[var]``system.build.initialRamdisk``::
+The initial ramdisk and kernel of the system.
+This allows a quick way to test whether the kernel and the initial ramdisk boot correctly, by using QEMU`'s [option]``-kernel`` and [option]``-initrd`` options: 
++
+----
+
+$ nix-build -A config.system.build.initialRamdisk -o initrd
+$ nix-build -A config.system.build.kernel -o kernel
+$ qemu-system-x86_64 -kernel ./kernel/bzImage -initrd ./initrd/initrd -hda /dev/null
+----
+
+[var]``system.build.nixos-rebuild``::
+These build the corresponding NixOS commands. 
+
+[var]``systemd.units.[replaceable]``unit-name``.unit``::
+This builds the unit with the specified name.
+Note that since unit names contain dots (e.g. ``httpd.service``), you need to put them between quotes, like this: 
++
+----
+
+$ nix-build -A 'config.systemd.units."httpd.service".unit'
+----
+
+You can also test individual units, without rebuilding the whole system, by putting them in [path]``/run/systemd/system``
+: 
+----
+
+$ cp $(nix-build -A 'config.systemd.units."httpd.service".unit')/httpd.service \
+    /run/systemd/system/tmp-httpd.service
+# systemctl daemon-reload
+# systemctl start tmp-httpd.service
+----
+
+Note that the unit must not have the same name as any unit in [path]``/etc/systemd/system``
+ since those take precedence over [path]``/run/systemd/system``
+.
+That`'s why the unit is installed as [path]``tmp-httpd.service``
+ here. 

@@ -1,0 +1,17 @@
+[[_chap_special]]
+= Special builders
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+This chapter describes several special builders. 
+
+include::special/fhs-environments.adoc[leveloffset=1]
+
+
+include::special/mkshell.adoc[leveloffset=1]

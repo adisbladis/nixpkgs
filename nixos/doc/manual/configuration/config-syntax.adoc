@@ -1,0 +1,28 @@
+[[_sec_configuration_syntax]]
+= Configuration Syntax
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+The NixOS configuration file [path]``/etc/nixos/configuration.nix``
+ is actually a __Nix
+  expression__, which is the Nix package manager`'s purely functional language for describing how to build packages and configurations.
+This means you have all the expressive power of that language at your disposal, including the ability to abstract over common patterns, which is very useful when managing complex systems.
+The syntax and semantics of the Nix language are fully described in the http://nixos.org/nix/manual/#chap-writing-nix-expressions[Nix
+  manual], but here we give a short overview of the most important constructs useful in NixOS configuration files. 
+
+include::config-file.adoc[leveloffset=1]
+
+
+include::abstractions.adoc[leveloffset=1]
+
+
+include::modularity.adoc[leveloffset=1]
+
+
+include::summary.adoc[leveloffset=1]

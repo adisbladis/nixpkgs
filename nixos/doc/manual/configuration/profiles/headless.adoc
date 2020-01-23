@@ -1,0 +1,8 @@
+
+[[_sec_profile_headless]]
+= Headless
+
+
+Common configuration for headless machines (e.g., Amazon EC2 instances). 
+
+Disables <<_opt_sound.enable,sound>>, <<_opt_boot.vesa,vesa>>, serial consoles, <<_opt_systemd.enableemergencymode,emergency mode>>, <<_opt_boot.loader.grub.splashimage,grub splash images>> and configures the kernel to reboot automatically on panic. 

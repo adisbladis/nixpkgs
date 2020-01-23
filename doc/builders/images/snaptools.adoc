@@ -1,0 +1,51 @@
+
+[[_sec_pkgs_snaptools]]
+= pkgs.snapTools
+
+[var]``pkgs.snapTools`` is a set of functions for creating Snapcraft images.
+Snap and Snapcraft is not used to perform these operations. 
+
+[[_ssec_pkgs_snaptools_makesnap_signature]]
+== The makeSnap Function
+
+`makeSnap` takes a single named argument, [parameter]``meta``.
+This argument mirrors https://docs.snapcraft.io/snap-format[the upstream snap.yaml format] exactly. 
+
+The [parameter]``base`` should not be be specified, as `makeSnap` will force set it. 
+
+Currently, `makeSnap` does not support creating GUI stubs. 
+
+[[_ssec_pkgs_snaptools_build_a_snap_hello]]
+== Build a Hello World Snap
+
+[[_ex_snaptools_buildsnap_hello]]
+.Making a Hello World Snap
+====
+The following expression packages GNU Hello as a Snapcraft snap. 
+
+[source]
+----
+include::{sourcedir}/./snap/example-hello.nix[]
+----
+
+[command]``nix-build`` this expression and install it with [command]``snap install ./result --dangerous``. [command]``hello`` will now be the Snapcraft version of the package. 
+====
+
+[[_ssec_pkgs_snaptools_build_a_snap_firefox]]
+== Build a Hello World Snap
+
+[[_ex_snaptools_buildsnap_firefox]]
+.Making a Graphical Snap
+====
+Graphical programs require many more integrations with the host.
+This example uses Firefox as an example, because it is one of the most complicated programs we could package. 
+
+[source]
+----
+include::{sourcedir}/./snap/example-firefox.nix[]
+----
+
+[command]``nix-build`` this expression and install it with [command]``snap install ./result --dangerous``. [command]``nix-example-firefox`` will now be the Snapcraft version of the Firefox package. 
+
+The specific meaning behind plugs can be looked up in the https://docs.snapcraft.io/supported-interfaces[Snapcraft interface documentation]. 
+====
