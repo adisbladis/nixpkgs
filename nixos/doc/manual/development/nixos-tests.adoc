@@ -1,0 +1,22 @@
+[[_sec_nixos_tests]]
+= NixOS Tests
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+When you add some feature to NixOS, you should write a test for it.
+NixOS tests are kept in the directory [path]``nixos/tests``
+, and are executed (using Nix) by a testing framework that automatically starts one or more virtual machines containing the NixOS system(s) required for the test. 
+
+include::writing-nixos-tests.adoc[leveloffset=1]
+
+
+include::running-nixos-tests.adoc[leveloffset=1]
+
+
+include::running-nixos-tests-interactively.adoc[leveloffset=1]

@@ -1,0 +1,157 @@
+[[_chap_multiple_output]]
+= Multiple-output packages
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+[[_sec_multiple_outputs_introduction]]
+== Introduction
+
+
+The Nix language allows a derivation to produce multiple outputs, which is similar to what is utilized by other Linux distribution packaging systems.
+The outputs reside in separate Nix store paths, so they can be mostly handled independently of each other, including passing to build inputs, garbage collection or binary substitution.
+The exception is that building from source always produces all the outputs. 
+
+The main motivation is to save disk space by reducing runtime closure sizes; consequently also sizes of substituted binaries get reduced.
+Splitting can be used to have more granular runtime dependencies, for example the typical reduction is to split away development-only files, as those are typically not needed during runtime.
+As a result, closure sizes of many packages can get reduced to a half or even much less. 
+
+[NOTE]
+====
+The reduction effects could be instead achieved by building the parts in completely separate derivations.
+That would often additionally reduce build-time closures, but it tends to be much harder to write such derivations, as build systems typically assume all parts are being built at once.
+This compromise approach of single source package producing multiple binary packages is also utilized often by rpm and deb. 
+====
+
+[[_sec_multiple_outputs_installing]]
+== Installing a split package
+
+
+When installing a package via [var]``systemPackages`` or [command]``nix-env`` you have several options: 
+
+* You can install particular outputs explicitly, as each is available in the Nix language as an attribute of the package. The [var]``outputs`` attribute contains a list of output names. 
+* You can let it use the default outputs. These are handled by [var]``meta.outputsToInstall`` attribute that contains a list of output names. 
++ 
+TODO: more about tweaking the attribute, etc. 
+* NixOS provides configuration option [var]``environment.extraOutputsToInstall`` that allows adding extra outputs of [var]``environment.systemPackages`` atop the default ones. It's mainly meant for documentation and debug symbols, and it's also modified by specific options. 
++
+NOTE: At this moment there is no similar configurability for packages installed by [command]``nix-env``.
+You can still use approach from <<_sec_modify_via_packageoverrides>> to override [var]``meta.outputsToInstall`` attributes, but that's a rather inconvenient way. 
++
+
+
+
+[[_sec_multiple_outputs_using_split_packages]]
+== Using a split package
+
+
+In the Nix language the individual outputs can be reached explicitly as attributes, e.g. [var]``coreutils.info``, but the typical case is just using packages as build inputs. 
+
+When a multiple-output derivation gets into a build input of another derivation, the [var]``dev`` output is added if it exists, otherwise the first output is added.
+In addition to that, [var]``propagatedBuildOutputs`` of that package which by default contain [var]``$outputBin`` and [var]``$outputLib`` are also added.
+(See <<_multiple_output_file_type_groups>>.) 
+
+In some cases it may be desirable to combine different outputs under a single store path.
+A function `symlinkJoin` can be used to do this.
+(Note that it may negate some closure size benefits of using a multiple-output package.) 
+
+[[_sec_multiple_outputs_]]
+== Writing a split derivation
+
+
+Here you find how to write a derivation that produces multiple outputs. 
+
+In nixpkgs there is a framework supporting multiple-output derivations.
+It tries to cover most cases by default behavior.
+You can find the source separated in <[path]``nixpkgs/pkgs/build-support/setup-hooks/multiple-outputs.sh``
+>; it's relatively well-readable.
+The whole machinery is triggered by defining the [var]``outputs`` attribute to contain the list of desired output names (strings). 
+
+[source]
+----
+outputs = [ "bin" "dev" "out" "doc" ];
+----
+
+
+Often such a single line is enough.
+For each output an equally named environment variable is passed to the builder and contains the path in nix store for that output.
+Typically you also want to have the main [var]``out`` output, as it catches any files that didn't get elsewhere. 
+
+[NOTE]
+====
+There is a special handling of the [var]``debug`` output, described at <<_stdenv_separatedebuginfo>>. 
+====
+
+[[_multiple_output_file_binaries_first_convention]]
+=== "` Binaries first`"
+
+
+A commonly adopted convention in `nixpkgs` is that executables provided by the package are contained within its first output.
+This convention allows the dependent packages to reference the executables provided by packages in a uniform manner.
+For instance, provided with the knowledge that the `perl` package contains a `perl` executable it can be referenced as `${pkgs.perl}/bin/perl` within a Nix derivation that needs to execute a Perl script. 
+
+The `glibc` package is a deliberate single exception to the "`binaries first`"
+ convention.
+The `glibc` has `libs` as its first output allowing the libraries provided by `glibc` to be referenced directly (e.g. ``${stdenv.glibc}/lib/ld-linux-x86-64.so.2``). The executables provided by `glibc` can be accessed via its `bin` attribute (e.g. ``${stdenv.glibc.bin}/bin/ldd``). 
+
+The reason for why `glibc` deviates from the convention is because referencing a library provided by `glibc` is a very common operation among Nix packages.
+For instance, third-party executables packaged by Nix are typically patched and relinked with the relevant version of `glibc` libraries from Nix packages (please see the documentation on https://nixos.org/patchelf.html[patchelf] for more details). 
+
+[[_multiple_output_file_type_groups]]
+=== File type groups
+
+
+The support code currently recognizes some particular kinds of outputs and either instructs the build system of the package to put files into their desired outputs or it moves the files during the fixup phase.
+Each group of file types has an [var]``outputFoo`` variable specifying the output name where they should go.
+If that variable isn't defined by the derivation writer, it is guessed {ndash}
+ a default output name is defined, falling back to other possibilities if the output isn't defined. 
+
+[var]`` $outputDev``::
+is for development-only files.
+These include C(++) headers, pkg-config, cmake and aclocal files.
+They go to [var]``dev`` or [var]``out`` by default. 
+
+[var]`` $outputBin``::
+is meant for user-facing binaries, typically residing in bin/. They go to [var]``bin`` or [var]``out`` by default. 
+
+[var]`` $outputLib``::
+is meant for libraries, typically residing in [path]``lib/``
+and [path]``libexec/``
+.
+They go to [var]``lib`` or [var]``out`` by default. 
+
+[var]`` $outputDoc``::
+is for user documentation, typically residing in [path]``share/doc/``
+.
+It goes to [var]``doc`` or [var]``out`` by default. 
+
+[var]`` $outputDevdoc``::
+is for _developer_ documentation.
+Currently we count gtk-doc and devhelp books in there.
+It goes to [var]``devdoc`` or is removed (!) by default.
+This is because e.g.
+gtk-doc tends to be rather large and completely unused by nixpkgs users. 
+
+[var]`` $outputMan``::
+is for man pages (except for section 3). They go to [var]``man`` or [var]``$outputBin`` by default. 
+
+[var]`` $outputDevman``::
+is for section 3 man pages.
+They go to [var]``devman`` or [var]``$outputMan`` by default. 
+
+[var]`` $outputInfo``::
+is for info pages.
+They go to [var]``info`` or [var]``$outputBin`` by default. 
+
+
+[[_sec_multiple_outputs_caveats]]
+=== Common caveats
+
+* Some configure scripts don't like some of the parameters passed by default by the framework, e.g. ``--docdir=/foo/bar``. You can disable this by setting ``setOutputFlags = false;``. 
+* The outputs of a single derivation can retain references to each other, but note that circular references are not allowed. (And each strongly-connected component would act as a single output anyway.) 
+* Most of split packages contain their core functionality in libraries. These libraries tend to refer to various kind of data that typically gets into [var]``out``, e.g. locale strings, so there is often no advantage in separating the libraries into [var]``lib``, as keeping them in [var]``out`` is easier. 
+* Some packages have hidden assumptions on install paths, which complicates splitting. 

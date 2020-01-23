@@ -1,0 +1,41 @@
+= Nixpkgs Users and Contributors Guide
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+
+:leveloffset: 1
+include::preface.chapter.adoc[]
+:leveloffset: 0
+# Using Nixpkgs
+include::using/configuration.adoc[]
+include::using/overlays.adoc[]
+include::using/overrides.adoc[]
+include::functions.adoc[]
+
+
+# Standard environment
+include::stdenv/stdenv.adoc[]
+include::stdenv/meta.adoc[]
+include::stdenv/multiple-output.adoc[]
+include::stdenv/cross-compilation.adoc[]
+include::stdenv/platform-notes.adoc[]
+
+
+# Builders
+include::builders/fetchers.adoc[]
+include::builders/trivial-builders.adoc[]
+include::builders/special.adoc[]
+include::builders/images.adoc[]
+include::languages-frameworks/index.adoc[]
+include::builders/packages/index.adoc[]
+
+
+# Contributing to Nixpkgs
+include::contributing/quick-start.adoc[]
+include::contributing/coding-conventions.adoc[]
+include::contributing/submitting-changes.adoc[]
+include::contributing/reviewing-contributions.adoc[]
+include::contributing/contributing-to-documentation.adoc[]
+

@@ -335,6 +335,12 @@ def convert_includes(filename):
         f.write('\n'.join(result))
 
 
+def lines_count(filename):
+    """Count lines excluding empty & comments"""
+    with open(filename) as f:
+        return len([l for l in f.read().split('\n') if l and not l.startswith('//')])
+
+
 def convert_docbook(filename):
     # Docbookrx cant convert man pages, these needs manual conversion
     if filename.startswith("man-"):
@@ -349,21 +355,21 @@ def convert_docbook(filename):
 
     # Suserx comes with a ton of bugfixes and better conversion but also crashes on me
     # Since I'm not interested in going down the ruby rabbit hole any further lets just hack it up
-    if p.returncode != 0:
+    if p.returncode != 0 or lines_count(file_to) == 0:
         p = subprocess.run(
             ["docbookrx", filename,], stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
 
     # If docbookrx failed (only one file failed during my testing) fall back to using pandoc
-    if p.returncode != 0:
+    if p.returncode != 0 or lines_count(file_to) == 0:
         with open(filename) as f:
             data = f.read()
             if "xi:include" in data:
-                sys.stdout.buffer.write(p.stdout)
-                sys.stderr.buffer.write(p.stderr)
-                raise ValueError(
-                    f"{filename}: xi:include is unsupported by pandoc and silently dropped"
-                )
+                if p.returncode != 0:
+                  sys.stdout.buffer.write(p.stdout)
+                  sys.stderr.buffer.write(p.stderr)
+                sys.stderr.write(f"{filename}: xi:include is unsupported by pandoc and silently dropped\n")
+                sys.stderr.flush()
 
         # Even though pandoc results are subpar we're better off with a conversion than no conversion
         p = subprocess.run(
@@ -418,6 +424,9 @@ if __name__ == "__main__":
 
         for f in find_doc_files():
 
+            # if f != 'nixos/doc/manual/man-nixos-rebuild.xml':
+            #     continue
+
             # if f != 'doc/manual.xml':
             #     continue
 
@@ -436,7 +445,5 @@ if __name__ == "__main__":
                 continue
                 exit(1)
 
-            if f:
-                print(f"Wrote {filename}")
-            else:
+            if not f:
                 print(f"Skipped {filename}")

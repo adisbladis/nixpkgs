@@ -1,0 +1,129 @@
+
+[[_sec_nix_syntax_summary]]
+= Syntax Summary
+
+
+Below is a summary of the most important syntactic constructs in the Nix expression language.
+It`'s not complete.
+In particular, there are many other built-in functions.
+See the http://nixos.org/nix/manual/#chap-writing-nix-expressions[Nix
+  manual] for the rest. 
+
+[cols="1,1", frame="none", options="header"]
+|===
+| Example
+| Description
+
+
+2+|__Basic values__
+
+|``"Hello world"``
+|A string
+
+|``"${pkgs.bash}/bin/sh"``
+|A string containing an expression (expands to ``"/nix/store/[replaceable]``hash``-bash-[replaceable]``version``/bin/sh"``)
+
+|``true``, `false`
+|Booleans
+
+|``123``
+|An integer
+
+|``$$.$$/foo.png``
+|A path (relative to the containing Nix expression)
+
+2+|__Compound values__
+
+|``{ x = 1; y = 2; }``
+|A set with attributes named `x` and `y`
+
+|``{ foo.bar = 1; }``
+|A nested set, equivalent to `{ foo = { bar = 1; }; }`
+
+|``rec { x = "foo"; y = x + "bar"; }``
+|A recursive set, equivalent to `{ x = "foo"; y = "foobar"; }`
+
+|``[ "foo" "bar" ]``
+|A list with two elements
+
+2+|__Operators__
+
+|``"foo" + "bar"``
+|String concatenation
+
+|``1 + 2``
+|Integer addition
+
+|``"foo" == "f" + "oo"``
+|Equality test (evaluates to ``true``)
+
+|``"foo" != "bar"``
+|Inequality test (evaluates to ``true``)
+
+|``!true``
+|Boolean negation
+
+|``{ x = 1; y = 2; }.x``
+|Attribute selection (evaluates to ``1``)
+
+|``{ x = 1; y = 2; }.z or 3``
+|Attribute selection with default (evaluates to ``3``)
+
+|``{ x = 1; y = 2; } // { z = 3; }``
+|Merge two sets (attributes in the right-hand set taking precedence)
+
+2+|__Control structures__
+
+|``if 1 + 1 == 2 then "yes!" else "no!"``
+|Conditional expression
+
+|``assert 1 + 1 == 2; "yes!"``
+|Assertion check (evaluates to ``"yes!"``). See <<_sec_assertions>> for using assertions in modules
+
+|``let x = "foo"; y = "bar"; in x + y``
+|Variable definition
+
+|``with pkgs.lib; head [ 1 2 3 ]``
+|Add all attributes from the given set to the scope
+        (evaluates to ``1``)
+
+2+|__Functions (lambdas)__
+
+|``x: x + 1``
+|A function that expects an integer and returns it increased by 1
+
+|``(x: x + 1) 100``
+|A function call (evaluates to 101)
+
+|``let inc = x: x + 1; in inc (inc (inc 100))``
+|A function bound to a variable and subsequently called by name (evaluates to 103)
+
+|``{ x, y }: x + y``
+|A function that expects a set with required attributes
+        `x` and `y` and concatenates
+        them
+
+|``{ x, y ? "bar" }: x + y``
+|A function that expects a set with required attribute
+        `x` and optional ``y``, using
+        `"bar"` as default value for
+        `y`
+
+|``{ x, y, ... }: x + y``
+|A function that expects a set with required attributes
+        `x` and `y` and ignores any
+        other attributes
+
+|``{ x, y } @ args: x + y``
+|A function that expects a set with required attributes
+        `x` and ``y``, and binds the
+        whole set to `args`
+
+2+|__Built-in functions__
+
+|``import ./foo.nix``
+|Load and return Nix expression in given file
+
+|``map (x: x + x) [ 1 2 3 ]``
+|Apply a function to every element of a list (evaluates to ``[ 2 4 6 ]``)
+|===

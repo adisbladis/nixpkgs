@@ -1,0 +1,59 @@
+[[_chap_packages]]
+= Packages
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+This chapter contains information about how to use and maintain the Nix expressions for a number of specific packages, such as the Linux kernel or X.org. 
+
+include::citrix.adoc[leveloffset=1]
+
+
+include::dlib.adoc[leveloffset=1]
+
+
+include::eclipse.adoc[leveloffset=1]
+
+
+include::elm.adoc[leveloffset=1]
+
+
+include::emacs.adoc[leveloffset=1]
+
+
+include::ibus.adoc[leveloffset=1]
+
+
+include::kakoune.adoc[leveloffset=1]
+
+
+include::linux.adoc[leveloffset=1]
+
+
+include::locales.adoc[leveloffset=1]
+
+
+include::nginx.adoc[leveloffset=1]
+
+
+include::opengl.adoc[leveloffset=1]
+
+
+include::shell-helpers.adoc[leveloffset=1]
+
+
+include::steam.adoc[leveloffset=1]
+
+
+include::urxvt.adoc[leveloffset=1]
+
+
+include::weechat.adoc[leveloffset=1]
+
+
+include::xorg.adoc[leveloffset=1]

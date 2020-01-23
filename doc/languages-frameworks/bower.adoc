@@ -1,0 +1,182 @@
+[[_sec_bower]]
+= Bower
+
+http://bower.io[Bower] is a package manager for web site front-end components.
+Bower packages (comprising of build artefacts and sometimes sources) are stored in [command]``git`` repositories, typically on Github.
+The package registry is run by the Bower team with package metadata coming from the [path]``bower.json``
+ file within each package. 
+
+The end result of running Bower is a [path]``bower_components``
+ directory which can be included in the web app's build process. 
+
+Bower can be run interactively, by installing [var]``nodePackages.bower``.
+More interestingly, the Bower components can be declared in a Nix derivation, with the help of [var]``nodePackages.bower2nix``. 
+
+[[_ssec_bower2nix_usage]]
+== [command]``bower2nix`` usage
+
+
+Suppose you have a [path]``bower.json``
+ with the following contents: 
+
+[[_ex_bowerjson]]
+.[path]``bower.json``
+====
+[source,json]
+----
+
+{
+  "name": "my-web-app",
+  "dependencies": {
+    "angular": "~1.5.0",
+    "bootstrap": "~3.3.6"
+  }
+}
+----
+====
+
+Running [command]``bower2nix`` will produce something like the following output: 
+[source,nix]
+----
+
+{ fetchbower, buildEnv }:
+buildEnv { name = "bower-env"; ignoreCollisions = true; paths = [
+  (fetchbower "angular" "1.5.3" "~1.5.0" "1749xb0firxdra4rzadm4q9x90v6pzkbd7xmcyjk6qfza09ykk9y")
+  (fetchbower "bootstrap" "3.3.6" "~3.3.6" "1vvqlpbfcy0k5pncfjaiskj3y6scwifxygfqnw393sjfxiviwmbv")
+  (fetchbower "jquery" "2.2.2" "1.9.1 - 2" "10sp5h98sqwk90y4k6hbdviwqzvzwqf47r3r51pakch5ii2y7js1")
+]; }
+----
+
+Using the [command]``bower2nix`` command line arguments, the output can be redirected to a file.
+A name like [path]``bower-packages.nix``
+ would be fine. 
+
+The resulting derivation is a union of all the downloaded Bower packages (and their dependencies). To use it, they still need to be linked together by Bower, which is where [var]``buildBowerComponents`` is useful. 
+
+[[_ssec_build_bower_components]]
+== [var]`` buildBowerComponents`` function
+
+
+The function is implemented in https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/bower-modules/generic/default.nix[ pkgs/development/bower-modules/generic/default.nix].
+Example usage: 
+
+[[_ex_buildbowercomponents]]
+.buildBowerComponents
+====
+[source,nix]
+----
+
+bowerComponents = buildBowerComponents {
+  name = "my-web-app";
+  generated = ./bower-packages.nix; 
+  src = myWebApp; 
+};
+----
+====
+
+In <<_ex_buildbowercomponents>>, the following arguments are of special significance to the function: 
+
+      [var]``generated``
+ specifies the file which was created by [command]``bower2nix``
+.
+     
+
+      [var]``src``
+ is your project's sources. It needs to contain a [path]``bower.json``
+ file.
+     
+
+[var]``buildBowerComponents`` will run Bower to link together the output of [command]``bower2nix``, resulting in a [path]``bower_components``
+ directory which can be used. 
+
+Here is an example of a web frontend build process using [command]``gulp``.
+You might use [command]``grunt``, or anything else. 
+
+[[_ex_bowergulpfile]]
+.Example build script ([path]``gulpfile.js``)
+====
+[source,javascript]
+----
+
+var gulp = require('gulp');
+
+gulp.task('default', [], function () {
+  gulp.start('build');
+});
+
+gulp.task('build', [], function () {
+  console.log("Just a dummy gulp build");
+  gulp
+    .src(["./bower_components/**/*"])
+    .pipe(gulp.dest("./gulpdist/"));
+});
+----
+====
+
+[[_ex_buildbowercomponentsdefaultnix]]
+.Full example -- [path]``default.nix``
+====
+[source,nix]
+----
+
+{ myWebApp ? { outPath = ./.; name = "myWebApp"; }
+, pkgs ? import <nixpkgs> {}
+}:
+
+pkgs.stdenv.mkDerivation {
+  name = "my-web-app-frontend";
+  src = myWebApp;
+
+  buildInputs = [ pkgs.nodePackages.gulp ];
+
+  bowerComponents = pkgs.buildBowerComponents { 
+    name = "my-web-app";
+    generated = ./bower-packages.nix;
+    src = myWebApp;
+  };
+
+  buildPhase = ''
+    cp --reflink=auto --no-preserve=mode -R $bowerComponents/bower_components . 
+    export HOME=$PWD 
+    ${pkgs.nodePackages.gulp}/bin/gulp build 
+  '';
+
+  installPhase = "mv gulpdist $out";
+}
+----
+====
+
+
+A few notes about <<_ex_buildbowercomponentsdefaultnix>>: 
+
+      The result of [var]``buildBowerComponents``
+ is an input to the frontend build.
+     
+
+      Whether to symlink or copy the [path]``bower_components``
+ directory depends on the build tool in use. In this case a copy is used to avoid [command]``
+gulp``
+ silliness with permissions.
+     
+
+      [command]``gulp``
+ requires [var]``HOME``
+ to refer to a writeable directory.
+     
+
+      The actual build command. Other tools could be used.
+     
+
+[[_ssec_bower2nix_troubleshooting]]
+== Troubleshooting
+
+`ENOCACHE` errors from [var]``buildBowerComponents``::
+This means that Bower was looking for a package version which doesn't exist in the generated [path]``bower-packages.nix``
+. 
++
+If [path]``bower.json``
+has been updated, then run [command]``bower2nix`` again. 
++
+It could also be a bug in [command]``bower2nix`` or [command]``fetchbower``.
+If possible, try reformulating the version specification in [path]``bower.json``
+. 

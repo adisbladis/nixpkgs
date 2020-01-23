@@ -1,0 +1,14 @@
+
+[[_sec_kakoune]]
+= Kakoune
+
+
+Kakoune can be built to autoload plugins: 
+[source]
+----
+(kakoune.override {
+  configure = {
+    plugins = with pkgs.kakounePlugins; [ parinfer-rust ];
+  };
+})
+----

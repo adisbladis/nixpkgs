@@ -1,0 +1,78 @@
+[[_sec_custom_packages]]
+= Adding Custom Packages
+
+
+It`'s possible that a package you need is not available in NixOS.
+In that case, you can do two things.
+First, you can clone the Nixpkgs repository, add the package to your clone, and (optionally) submit a patch or pull request to have it accepted into the main Nixpkgs repository.
+This is described in detail in the http://nixos.org/nixpkgs/manual[Nixpkgs
+  manual].
+In short, you clone Nixpkgs: 
+----
+
+$ git clone https://github.com/NixOS/nixpkgs
+$ cd nixpkgs
+----
+
+Then you write and test the package as described in the Nixpkgs manual.
+Finally, you add it to ``environment.systemPackages``, e.g. 
+[source]
+----
+
+ = [ pkgs.my-package ];
+----
+
+and you run [command]``nixos-rebuild``, specifying your own Nixpkgs tree: 
+----
+# nixos-rebuild switch -I nixpkgs=/path/to/my/nixpkgs
+----
+
+The second possibility is to add the package outside of the Nixpkgs tree.
+For instance, here is how you specify a build of the https://www.gnu.org/software/hello/[GNU Hello] package directly in [path]``configuration.nix``
+: 
+[source]
+----
+
+ =
+  let
+    my-hello = with pkgs; stdenv.mkDerivation rec {
+      name = "hello-2.8";
+      src = fetchurl {
+        url = "mirror://gnu/hello/${name}.tar.gz";
+        sha256 = "0wqd8sjmxfskrflaxywc7gqw7sfawrfvdxd9skxawzfgyy0pzdz6";
+      };
+    };
+  in
+  [ my-hello ];
+----
+
+Of course, you can also move the definition of `my-hello` into a separate Nix expression, e.g. 
+[source]
+----
+
+ = [ (import ./my-hello.nix) ];
+----
+
+where [path]``my-hello.nix``
+ contains: 
+[source]
+----
+
+with import <nixpkgs> {}; # bring all of Nixpkgs into scope
+
+stdenv.mkDerivation rec {
+  name = "hello-2.8";
+  src = fetchurl {
+    url = "mirror://gnu/hello/${name}.tar.gz";
+    sha256 = "0wqd8sjmxfskrflaxywc7gqw7sfawrfvdxd9skxawzfgyy0pzdz6";
+  };
+}
+----
+
+This allows testing the package easily: 
+----
+
+$ nix-build my-hello.nix
+$ ./result/bin/hello
+Hello, world!
+----

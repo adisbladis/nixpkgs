@@ -1,0 +1,148 @@
+= nixos-install(8)
+:doctype: manpage
+:manvolnum: 8
+:manmanual: nixos-install
+:mansource: NixOS
+
+== NAME
+
+nixos-install - install bootloader and NixOS
+
+== SYNOPSIS
+
+[{ --verbose | -v }] [{ --print-build-logs | -L }] [-I path] [--root root] [--system path] [--channel channel] [--no-channel-copy] [--no-root-passwd] [--no-bootloader] [{ --max-jobs | -j } number] [--cores number] [--option value] [--show-trace] [--help] 
+
+
+  
+== Description
+
+   This command installs NixOS in the file system mounted on
+   `/mnt`, based on the NixOS configuration specified in
+   `/mnt/etc/nixos/configuration.nix`. It performs the
+   following steps:
+   `
+      It copies Nix and its dependencies to
+      
+    `
+      It runs Nix in 
+    `
+        It installs the current channel 
+    `
+      It installs the GRUB boot loader on the device specified in the option
+      
+    `
+      It prompts you for a password for the root account (unless
+      
+    
+
+
+   This command is idempotent: if it is interrupted or fails due to a temporary
+   problem (e.g. a network issue), you can safely re-run it.
+  
+
+
+
+  
+== Options
+
+   This command accepts the following options:
+  
+
+
+    *--verbose* / *-v*NoneIncreases the level of verbosity of diagnostic messages
+     printed on standard error.  For each Nix operation, the information
+     printed on standard output is well-defined; any diagnostic
+     information is printed on standard error, never on standard
+     output.Please note that this option may be specified repeatedly.
+   
+
+    *--print-build-logs* / *-L*NonePrint the full build logs of `_nix build_` to stderr.
+   
+
+    *--root*
+    
+      Defaults to `/mnt`. If this option is given, treat the
+      directory 
+   
+
+    *--system*
+    
+      If this option is provided, `_nixos-install_` will install
+      the specified closure rather than attempt to build one from
+      `/mnt/etc/nixos/configuration.nix`.
+     
+      The closure must be an appropriately configured NixOS system, with boot
+      loader and partition configuration that fits the target host. Such a
+      closure is typically obtained with a command such as `_nix-build
+      -I nixos-config=./configuration.nix '<nixpkgs/nixos>' -A system
+      --no-out-link_`
+     
+   
+
+     *--channel*
+     
+         If this option is provided, do not copy the current
+         
+   
+
+    *-I*
+    
+      Add a path to the Nix expression search path. This option may be given
+      multiple times. See the NIX_PATH environment variable for information on
+      the semantics of the Nix search path. Paths added through
+      
+   
+
+    *--max-jobs*
+    *-j*
+    
+      Sets the maximum number of build jobs that Nix will perform in parallel
+      to the specified number. The default is `1`. A higher
+      value is useful on SMP systems or to exploit I/O latency.
+     
+   
+
+    *--cores*
+    
+      Sets the value of the `true`, the builder passes the
+      *-j* flag to GNU Make. The
+      value `0` means that the builder should use all
+      available CPU cores in the system.
+     
+   
+
+    *--option* name value
+    
+      Set the Nix configuration option 
+   
+
+    *--show-trace*
+    
+      Causes Nix to print out a stack trace in case of Nix expression
+      evaluation errors.
+     
+   
+
+    *--help*
+    
+      Synonym for `_man nixos-install_`.
+     
+  
+
+
+  
+== Examples
+
+   A typical NixOS installation is done by creating and mounting a file system
+   on `/mnt`, generating a NixOS configuration in
+   `/mnt/etc/nixos/configuration.nix`, and running
+   `_nixos-install_`. For instance, if we want to install NixOS
+   on an `ext4` file system created in
+   `/dev/sda1`:
+    $  mkfs.ext4 /dev/sda1
+    $  mount /dev/sda1 /mnt
+    $  nixos-generate-config --root /mnt
+    $  # edit /mnt/etc/nixos/configuration.nix
+    $  nixos-install
+    $  reboot
+

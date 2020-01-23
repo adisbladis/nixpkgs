@@ -1,0 +1,26 @@
+[[_ch_troubleshooting]]
+= Troubleshooting
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+This chapter describes solutions to common problems you might encounter when you manage your NixOS system. 
+
+include::boot-problems.adoc[leveloffset=1]
+
+
+include::maintenance-mode.adoc[leveloffset=1]
+
+
+include::rollback.adoc[leveloffset=1]
+
+
+include::store-corruption.adoc[leveloffset=1]
+
+
+include::network-problems.adoc[leveloffset=1]

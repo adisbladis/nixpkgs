@@ -1,0 +1,86 @@
+[[_chap_language_support]]
+= Languages and frameworks
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+The <<_chap_stdenv,standard build environment>> makes it easy to build typical Autotools-based packages with very little code.
+Any other kind of package can be accomodated by overriding the appropriate phases of ``stdenv``.
+However, there are specialised functions in Nixpkgs to easily build packages for other programming languages, such as Perl or Haskell.
+These are described in this chapter. 
+
+include::android.section.adoc[leveloffset=1]
+
+
+include::beam.adoc[leveloffset=1]
+
+
+include::bower.adoc[leveloffset=1]
+
+
+include::coq.adoc[leveloffset=1]
+
+
+include::crystal.section.adoc[leveloffset=1]
+
+
+include::emscripten.section.adoc[leveloffset=1]
+
+
+include::gnome.adoc[leveloffset=1]
+
+
+include::go.adoc[leveloffset=1]
+
+
+include::haskell.section.adoc[leveloffset=1]
+
+
+include::idris.section.adoc[leveloffset=1]
+
+
+include::ios.section.adoc[leveloffset=1]
+
+
+include::java.adoc[leveloffset=1]
+
+
+include::lua.adoc[leveloffset=1]
+
+
+include::node.section.adoc[leveloffset=1]
+
+
+include::ocaml.adoc[leveloffset=1]
+
+
+include::perl.adoc[leveloffset=1]
+
+
+include::python.section.adoc[leveloffset=1]
+
+
+include::qt.adoc[leveloffset=1]
+
+
+include::r.section.adoc[leveloffset=1]
+
+
+include::ruby.adoc[leveloffset=1]
+
+
+include::rust.section.adoc[leveloffset=1]
+
+
+include::texlive.adoc[leveloffset=1]
+
+
+include::titanium.section.adoc[leveloffset=1]
+
+
+include::vim.section.adoc[leveloffset=1]

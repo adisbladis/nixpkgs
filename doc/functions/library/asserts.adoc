@@ -1,0 +1,64 @@
+
+[[_sec_functions_library_asserts]]
+= Assert functions
+
+[[_function_library_lib.asserts.assertmsg]]
+== `` lib.asserts.assertMsg``: `assertMsg {two-colons} Bool -> String -> Bool`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Print a trace message if `pred` is false. 
+
+Intended to be used to augment asserts with helpful error messages. 
+
+[var]``pred``::
+Condition under which the [var]``msg`` should _not_ be printed. 
+
+[var]``msg``::
+Message to print. 
+
+
+[[_function_library_lib.asserts.assertmsg_example_false]]
+.Printing when the predicate is false
+====
+[source]
+----
+
+assert lib.asserts.assertMsg ("foo" == "bar") "foo is not bar, silly"
+stderr> trace: foo is not bar, silly
+stderr> assert failed
+----
+====
+
+[[_function_library_lib.asserts.assertoneof]]
+== `` lib.asserts.assertOneOf``: `assertOneOf {two-colons} String -> String -> StringList -> Bool`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Specialized `asserts.assertMsg` for checking if [var]``val`` is one of the elements of [var]``xs``.
+Useful for checking enums. 
+
+[var]``name``::
+The name of the variable the user entered [var]``val`` into, for inclusion in the error message. 
+
+[var]``val``::
+The value of what the user provided, to be compared against the values in [var]``xs``. 
+
+[var]``xs``::
+The list of valid values. 
+
+
+[[_function_library_lib.asserts.assertoneof_example]]
+.Ensuring a user provided a possible value
+====
+[source]
+----
+
+let sslLibrary = "bearssl";
+in lib.asserts.assertOneOf "sslLibrary" sslLibrary [ "openssl" "bearssl" ];
+=> false
+stderr> trace: sslLibrary must be one of "openssl", "libressl", but is: "bearssl"
+----
+====

@@ -1,0 +1,8 @@
+[[_sec_profile_demo]]
+= Demo
+
+
+This profile just enables a [username]``demo``
+ user, with password ``demo``, uid ``1000``, [groupname]``wheel``
+ group and <<_opt_services.xserver.displaymanager.sddm.autologin, autologin
+  in the SDDM display manager>>. 

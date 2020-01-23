@@ -1,0 +1,20 @@
+[[_ch_installation]]
+= Installation
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+include::obtaining.adoc[leveloffset=1]
+
+
+include::installing.adoc[leveloffset=1]
+
+
+include::changing-config.adoc[leveloffset=1]
+
+
+include::upgrading.adoc[leveloffset=1]

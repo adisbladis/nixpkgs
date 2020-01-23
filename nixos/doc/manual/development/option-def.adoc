@@ -1,0 +1,99 @@
+[[_sec_option_definitions]]
+= Option Definitions
+
+
+Option definitions are generally straight-forward bindings of values to option names, like 
+[source]
+----
+
+config = {
+  services.httpd.enable = true;
+};
+----
+
+However, sometimes you need to wrap an option definition or set of option definitions in a _property_ to achieve certain effects: 
+
+[[_sec_option_definitions_delaying_conditionals]]
+== Delaying Conditionals
+
+
+If a set of option definitions is conditional on the value of another option, you may need to use [var]``mkIf``.
+Consider, for instance: 
+[source]
+----
+
+config = if config.services.httpd.enable then {
+  environment.systemPackages = [ ... ];
+  ...
+} else {};
+----
+
+This definition will cause Nix to fail with an "`infinite recursion`" error.
+Why? Because the value of [option]``config.services.httpd.enable`` depends on the value being constructed here.
+After all, you could also write the clearly circular and contradictory: 
+[source]
+----
+
+config = if config.services.httpd.enable then {
+  services.httpd.enable = false;
+} else {
+  services.httpd.enable = true;
+};
+----
+
+The solution is to write: 
+[source]
+----
+
+config = mkIf config.services.httpd.enable {
+  environment.systemPackages = [ ... ];
+  ...
+};
+----
+
+The special function [var]``mkIf`` causes the evaluation of the conditional to be "`pushed down`" into the individual definitions, as if you had written: 
+[source]
+----
+
+config = {
+  environment.systemPackages = if config.services.httpd.enable then [ ... ] else [];
+  ...
+};
+----
+
+[[_sec_option_definitions_setting_priorities]]
+== Setting Priorities
+
+
+A module can override the definitions of an option in other modules by setting a __priority__.
+All option definitions that do not have the lowest priority value are discarded.
+By default, option definitions have priority 1000.
+You can specify an explicit priority by using [var]``mkOverride``, e.g. 
+[source]
+----
+
+services.openssh.enable = mkOverride 10 false;
+----
+
+This definition causes all other definitions with priorities above 10 to be discarded.
+The function [var]``mkForce`` is equal to [var]``mkOverride 50``. 
+
+[[_sec_option_definitions_merging]]
+== Merging Configurations
+
+
+In conjunction with ``mkIf``, it is sometimes useful for a module to return multiple sets of option definitions, to be merged together as if they were declared in separate modules.
+This can be done using [var]``mkMerge``: 
+[source]
+----
+
+config = mkMerge
+  [ # Unconditional stuff.
+    { environment.systemPackages = [ ... ];
+    }
+    # Conditional stuff.
+    (mkIf config.services.bla.enable {
+      environment.systemPackages = [ ... ];
+    })
+  ];
+----

@@ -1,0 +1,32 @@
+[[_sec_networking]]
+= Networking
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+This section describes how to configure networking components on your NixOS machine. 
+
+include::network-manager.adoc[leveloffset=1]
+
+
+include::ssh.adoc[leveloffset=1]
+
+
+include::ipv4-config.adoc[leveloffset=1]
+
+
+include::ipv6-config.adoc[leveloffset=1]
+
+
+include::firewall.adoc[leveloffset=1]
+
+
+include::wireless.adoc[leveloffset=1]
+
+
+include::ad-hoc-network-config.adoc[leveloffset=1]

@@ -1,0 +1,1020 @@
+
+[[_sec_functions_library_attrset]]
+= Attribute-Set Functions
+
+[[_function_library_lib.attrsets.attrbypath]]
+== `` lib.attrset.attrByPath``: `attrByPath {two-colons} [String] -> Any -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Return an attribute from within nested attribute sets. 
+
+[var]``attrPath``::
+A list of strings representing the path through the nested attribute set [var]``set``. 
+
+[var]``default``::
+Default value if [var]``attrPath`` does not resolve to an existing value. 
+
+[var]``set``::
+The nested attributeset to select values from. 
+
+
+[[_function_library_lib.attrset.attrbypath_example_value_exists]]
+.Extracting a value from a nested attribute set
+====
+[source]
+----
+
+let set = { a = { b = 3; }; };
+in lib.attrsets.attrByPath [ "a" "b" ] 0 set
+=> 3
+----
+====
+
+[[_function_library_lib.attrset.attrbypath_example_default_value]]
+.No value at the path, instead using the default
+====
+[source]
+----
+
+lib.attrsets.attrByPath [ "a" "b" ] 0 {}
+=> 0
+----
+====
+
+[[_function_library_lib.attrsets.hasattrbypath]]
+== `` lib.attrsets.hasAttrByPath``: `hasAttrByPath {two-colons} [String] -> AttrSet -> Bool`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Determine if an attribute exists within a nested attribute set. 
+
+[var]``attrPath``::
+A list of strings representing the path through the nested attribute set [var]``set``. 
+
+[var]``set``::
+The nested attributeset to check. 
+
+
+[[_function_library_lib.attrsets.hasattrbypath_example]]
+.A nested value does exist inside a set
+====
+[source]
+----
+
+lib.attrsets.hasAttrByPath
+  [ "a" "b" "c" "d" ]
+  { a = { b = { c = { d = 123; }; }; }; }
+=> true
+----
+====
+
+[[_function_library_lib.attrsets.setattrbypath]]
+== `` lib.attrsets.setAttrByPath``: `setAttrByPath {two-colons} [String] -> Any -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Create a new attribute set with [var]``value`` set at the nested attribute location specified in [var]``attrPath``. 
+
+[var]``attrPath``::
+A list of strings representing the path through the nested attribute set. 
+
+[var]``value``::
+The value to set at the location described by [var]``attrPath``. 
+
+
+[[_function_library_lib.attrsets.setattrbypath_example]]
+.Creating a new nested attribute set
+====
+[source]
+----
+
+lib.attrsets.setAttrByPath [ "a" "b" ] 3
+=> { a = { b = 3; }; }
+----
+====
+
+[[_function_library_lib.attrsets.getattrfrompath]]
+== `` lib.attrsets.getAttrFromPath``: `getAttrFromPath {two-colons} [String] -> AttrSet -> Value`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Like <<_function_library_lib.attrsets.attrbypath>> except without a default, and it will throw if the value doesn't exist. 
+
+[var]``attrPath``::
+A list of strings representing the path through the nested attribute set [var]``set``. 
+
+[var]``set``::
+The nested attribute set to find the value in. 
+
+
+[[_function_library_lib.attrsets.getattrpath_example_success]]
+.Succesfully getting a value from an attribute set
+====
+[source]
+----
+
+lib.attrsets.getAttrFromPath [ "a" "b" ] { a = { b = 3; }; }
+=> 3
+----
+====
+
+[[_function_library_lib.attrsets.getattrpath_example_throw]]
+.Throwing after failing to get a value from an attribute set
+====
+[source]
+----
+
+lib.attrsets.getAttrFromPath [ "x" "y" ] { }
+=> error: cannot find attribute `x.y'
+----
+====
+
+[[_function_library_lib.attrsets.attrvals]]
+== `` lib.attrsets.attrVals``: `attrVals {two-colons} [String] -> AttrSet -> [Any]`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Return the specified attributes from a set.
+All values must exist. 
+
+[var]``nameList``::
+The list of attributes to fetch from [var]``set``.
+Each attribute name must exist on the attrbitue set. 
+
+[var]``set``::
+The set to get attribute values from. 
+
+
+[[_function_library_lib.attrsets.attrvals_example_success]]
+.Getting several values from an attribute set
+====
+[source]
+----
+
+lib.attrsets.attrVals [ "a" "b" "c" ] { a = 1; b = 2; c = 3; }
+=> [ 1 2 3 ]
+----
+====
+
+[[_function_library_lib.attrsets.attrvals_failure]]
+.Getting missing values from an attribute set
+====
+[source]
+----
+
+lib.attrsets.attrVals [ "d" ] { }
+error: attribute 'd' missing
+----
+====
+
+[[_function_library_lib.attrsets.attrvalues]]
+== `` lib.attrsets.attrValues``: `attrValues {two-colons} AttrSet -> [Any]`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Get all the attribute values from an attribute set. 
+
+Provides a backwards-compatible interface of `builtins.attrValues` for Nix version older than 1.8. 
+
+[var]``attrs``::
+The attribute set. 
+
+
+[[_function_library_lib.attrsets.attrvalues_example]]
+.
+====
+[source]
+----
+
+lib.attrsets.attrValues { a = 1; b = 2; c = 3; }
+=> [ 1 2 3 ]
+----
+====
+
+[[_function_library_lib.attrsets.catattrs]]
+== `` lib.attrsets.catAttrs``: `catAttrs {two-colons} String -> [AttrSet] -> [Any]`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Collect each attribute named `attr' from the list of attribute sets, [var]``sets``.
+Sets that don't contain the named attribute are ignored. 
+
+Provides a backwards-compatible interface of `builtins.catAttrs` for Nix version older than 1.9. 
+
+[var]``attr``::
+Attribute name to select from each attribute set in [var]``sets``. 
+
+[var]``sets``::
+The list of attribute sets to select [var]``attr`` from. 
+
+
+[[_function_library_lib.attrsets.catattrs_example]]
+.Collect an attribute from a list of attribute sets.
+====
+Attribute sets which don't have the attribute are ignored. 
+
+[source]
+----
+
+catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
+=> [ 1 2 ]
+----
+====
+
+[[_function_library_lib.attrsets.filterattrs]]
+== `` lib.attrsets.filterAttrs``: `filterAttrs {two-colons} (String -> Any -> Bool) -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Filter an attribute set by removing all attributes for which the given predicate return false. 
+
+[var]``pred``::
+`String -> Any -> Bool`
++
+Predicate which returns true to include an attribute, or returns false to exclude it. 
+
+[var]``name``:::
+The attribute's name 
+
+[var]``value``:::
+The attribute's value 
+
++
+Returns `true` to include the attribute, `false` to exclude the attribute. 
+
+[var]``set``::
+The attribute set to filter 
+
+
+[[_function_library_lib.attrsets.filterattrs_example]]
+.Filtering an attributeset
+====
+[source]
+----
+
+filterAttrs (n: v: n == "foo") { foo = 1; bar = 2; }
+=> { foo = 1; }
+----
+====
+
+[[_function_library_lib.attrsets.filterattrsrecursive]]
+== `` lib.attrsets.filterAttrsRecursive``: `filterAttrsRecursive {two-colons} (String -> Any -> Bool) -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Filter an attribute set recursively by removing all attributes for which the given predicate return false. 
+
+[var]``pred``::
+`String -> Any -> Bool`
++
+Predicate which returns true to include an attribute, or returns false to exclude it. 
+
+[var]``name``:::
+The attribute's name 
+
+[var]``value``:::
+The attribute's value 
+
++
+Returns `true` to include the attribute, `false` to exclude the attribute. 
+
+[var]``set``::
+The attribute set to filter 
+
+
+[[_function_library_lib.attrsets.filterattrsrecursive_example]]
+.Recursively filtering an attribute set
+====
+[source]
+----
+
+lib.attrsets.filterAttrsRecursive
+  (n: v: v != null)
+  {
+    levelA = {
+      example = "hi";
+      levelB = {
+        hello = "there";
+        this-one-is-present = {
+          this-is-excluded = null;
+        };
+      };
+      this-one-is-also-excluded = null;
+    };
+    also-excluded = null;
+  }
+=> {
+     levelA = {
+       example = "hi";
+       levelB = {
+         hello = "there";
+         this-one-is-present = { };
+       };
+     };
+   }
+----
+====
+
+[[_function_library_lib.attrsets.foldattrs]]
+== `` lib.attrsets.foldAttrs``: `foldAttrs {two-colons} (Any -> Any -> Any) -> Any -> [AttrSets] -> Any`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Apply fold function to values grouped by key. 
+
+[var]``op``::
+`Any -> Any -> Any`
++
+Given a value [var]``val`` and a collector [var]``col``, combine the two. 
+
+[var]``val``:::
+An attribute's value 
+
+[var]``col``:::
+The result of previous `op` calls with other values and ``nul``. 
+
+[var]``nul``::
+The null-value, the starting value. 
+
+[var]``list_of_attrs``::
+A list of attribute sets to fold together by key. 
+
+
+[[_function_library_lib.attrsets.foldattrs_example]]
+.Combining an attribute of lists in to one attribute set
+====
+[source]
+----
+
+lib.attrsets.foldAttrs
+  (n: a: [n] ++ a) []
+  [
+    { a = 2; b = 7; }
+    { a = 3; }
+    { b = 6; }
+  ]
+=> { a = [ 2 3 ]; b = [ 7 6 ]; }
+----
+====
+
+[[_function_library_lib.attrsets.collect]]
+== `` lib.attrsets.collect``: `collect {two-colons} (Any -> Bool) -> AttrSet -> [Any]`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Recursively collect sets that verify a given predicate named [var]``pred`` from the set [var]``attrs``.
+The recursion stops when [var]``pred`` returns ``true``. 
+
+[var]``pred``::
+`Any -> Bool`
++
+Given an attribute's value, determine if recursion should stop. 
+
+[var]``value``:::
+The attribute set value. 
+
+[var]``attrs``::
+The attribute set to recursively collect. 
+
+
+[[_function_library_lib.attrsets.collect_example_lists]]
+.Collecting all lists from an attribute set
+====
+[source]
+----
+
+lib.attrsets.collect isList { a = { b = ["b"]; }; c = [1]; }
+=> [["b"] [1]]
+----
+====
+
+[[_function_library_lib.attrsets.collect_example_outpath]]
+.Collecting all attribute-sets which contain the `outPath` attribute name.
+====
+[source]
+----
+
+collect (x: x ? outPath)
+  { a = { outPath = "a/"; }; b = { outPath = "b/"; }; }
+=> [{ outPath = "a/"; } { outPath = "b/"; }]
+----
+====
+
+[[_function_library_lib.attrsets.namevaluepair]]
+== `` lib.attrsets.nameValuePair``: `nameValuePair {two-colons} String -> Any -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Utility function that creates a `{name, value}` pair as expected by ``builtins.listToAttrs``. 
+
+[var]``name``::
+The attribute name. 
+
+[var]``value``::
+The attribute value. 
+
+
+[[_function_library_lib.attrsets.namevaluepair_example]]
+.Creating a name value pair
+====
+[source]
+----
+
+nameValuePair "some" 6
+=> { name = "some"; value = 6; }
+----
+====
+
+[[_function_library_lib.attrsets.mapattrs]]
+== `` lib.attrsets.mapAttrs``: ``
+
+include::./locations.adoc[leveloffset=2]
+
+
+Apply a function to each element in an attribute set, creating a new attribute set. 
+
+Provides a backwards-compatible interface of `builtins.mapAttrs` for Nix version older than 2.1. 
+
+[var]``fn``::
+`String -> Any -> Any`
++
+Given an attribute's name and value, return a new value. 
+
+[var]``name``:::
+The name of the attribute. 
+
+[var]``value``:::
+The attribute's value. 
+
+
+[[_function_library_lib.attrsets.mapattrs_example]]
+.Modifying each value of an attribute set
+====
+[source]
+----
+
+lib.attrsets.mapAttrs
+  (name: value: name + "-" value)
+  { x = "foo"; y = "bar"; }
+=> { x = "x-foo"; y = "y-bar"; }
+----
+====
+
+[[_function_library_lib.attrsets.mapattrs_prime]]
+== `` lib.attrsets.mapAttrs'``: `mapAttrs' {two-colons} (String -> Any -> { name = String; value = Any }) -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Like ``mapAttrs``, but allows the name of each attribute to be changed in addition to the value.
+The applied function should return both the new name and value as a ``nameValuePair``. 
+
+[var]``fn``::
+`String -> Any -> { name = String; value = Any }`
++
+Given an attribute's name and value, return a new <<_function_library_lib.attrsets.namevaluepair,name value pair>>. 
+
+[var]``name``:::
+The name of the attribute. 
+
+[var]``value``:::
+The attribute's value. 
+
+[var]``set``::
+The attribute set to map over. 
+
+
+[[_function_library_lib.attrsets.mapattrs_prime_example]]
+.Change the name and value of each attribute of an attribute set
+====
+[source]
+----
+
+lib.attrsets.mapAttrs' (name: value: lib.attrsets.nameValuePair ("foo_" + name) ("bar-" + value))
+   { x = "a"; y = "b"; }
+=> { foo_x = "bar-a"; foo_y = "bar-b"; }
+----
+====
+
+[[_function_library_lib.attrsets.mapattrstolist]]
+== `` lib.attrsets.mapAttrsToList``: `mapAttrsToList {two-colons} (String -> Any -> Any) -> AttrSet -> Any`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Call [var]``fn`` for each attribute in the given [var]``set`` and return the result in a list. 
+
+[var]``fn``::
+`String -> Any -> Any`
++
+Given an attribute's name and value, return a new value. 
+
+[var]``name``:::
+The name of the attribute. 
+
+[var]``value``:::
+The attribute's value. 
+
+[var]``set``::
+The attribute set to map over. 
+
+
+[[_function_library_lib.attrsets.mapattrstolist_example]]
+.Combine attribute values and names in to a list
+====
+[source]
+----
+
+lib.attrsets.mapAttrsToList (name: value: "${name}=${value}")
+   { x = "a"; y = "b"; }
+=> [ "x=a" "y=b" ]
+----
+====
+
+[[_function_library_lib.attrsets.mapattrsrecursive]]
+== `` lib.attrsets.mapAttrsRecursive``: `mapAttrsRecursive {two-colons} ([String] > Any -> Any) -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Like ``mapAttrs``, except that it recursively applies itself to attribute sets.
+Also, the first argument of the argument function is a _list_ of the names of the containing attributes. 
+
+[var]``f``::
+`[ String ] -> Any -> Any`
++
+Given a list of attribute names and value, return a new value. 
+
+[var]``name_path``:::
+The list of attribute names to this value. 
++
+For example, the [var]``name_path`` for the `example` string in the attribute set `{ foo = { bar = "example"; }; }` is ``[ "foo" "bar" ]``. 
+
+[var]``value``:::
+The attribute's value. 
+
+[var]``set``::
+The attribute set to recursively map over. 
+
+
+[[_function_library_lib.attrsets.mapattrsrecursive_example]]
+.A contrived example of using `lib.attrsets.mapAttrsRecursive`
+====
+[source]
+----
+
+mapAttrsRecursive
+  (path: value: concatStringsSep "-" (path ++ [value]))
+  {
+    n = {
+      a = "A";
+      m = {
+        b = "B";
+        c = "C";
+      };
+    };
+    d = "D";
+  }
+=> {
+     n = {
+       a = "n-a-A";
+       m = {
+         b = "n-m-b-B";
+         c = "n-m-c-C";
+       };
+     };
+     d = "d-D";
+   }
+----
+====
+
+[[_function_library_lib.attrsets.mapattrsrecursivecond]]
+== `` lib.attrsets.mapAttrsRecursiveCond``: `mapAttrsRecursiveCond {two-colons} (AttrSet -> Bool) -> ([ String ] -> Any -> Any) -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Like ``mapAttrsRecursive``, but it takes an additional predicate function that tells it whether to recursive into an attribute set.
+If it returns false, `mapAttrsRecursiveCond` does not recurse, but does apply the map function.
+It is returns true, it does recurse, and does not apply the map function. 
+
+[var]``cond``::
+`(AttrSet -> Bool)`
++
+Determine if `mapAttrsRecursive` should recurse deeper in to the attribute set. 
+
+[var]``attributeset``:::
+An attribute set. 
+
+[var]``f``::
+`[ String ] -> Any -> Any`
++
+Given a list of attribute names and value, return a new value. 
+
+[var]``name_path``:::
+The list of attribute names to this value. 
++
+For example, the [var]``name_path`` for the `example` string in the attribute set `{ foo = { bar = "example"; }; }` is ``[ "foo" "bar" ]``. 
+
+[var]``value``:::
+The attribute's value. 
+
+[var]``set``::
+The attribute set to recursively map over. 
+
+
+[[_function_library_lib.attrsets.mapattrsrecursivecond_example]]
+.Only convert attribute values to JSON if the containing attribute set is marked for recursion
+====
+[source]
+----
+
+lib.attrsets.mapAttrsRecursiveCond
+  ({ recurse ? false, ... }: recurse)
+  (name: value: builtins.toJSON value)
+  {
+    dorecur = {
+      recurse = true;
+      hello = "there";
+    };
+    dontrecur = {
+      converted-to- = "json";
+    };
+  }
+=> {
+     dorecur = {
+       hello = "\"there\"";
+       recurse = "true";
+     };
+     dontrecur = "{\"converted-to\":\"json\"}";
+   }
+----
+====
+
+[[_function_library_lib.attrsets.genattrs]]
+== `` lib.attrsets.genAttrs``: `genAttrs {two-colons} [ String ] -> (String -> Any) -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Generate an attribute set by mapping a function over a list of attribute names. 
+
+[var]``names``::
+Names of values in the resulting attribute set. 
+
+[var]``f``::
+`String -> Any`
++
+Takes the name of the attribute and return the attribute's value. 
+
+[var]``name``:::
+The name of the attribute to generate a value for. 
+
+
+[[_function_library_lib.attrsets.genattrs_example]]
+.Generate an attrset based on names only
+====
+[source]
+----
+
+lib.attrsets.genAttrs [ "foo" "bar" ] (name: "x_${name}")
+=> { foo = "x_foo"; bar = "x_bar"; }
+----
+====
+
+[[_function_library_lib.attrsets.isderivation]]
+== `` lib.attrsets.isDerivation``: `isDerivation {two-colons} Any -> Bool`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Check whether the argument is a derivation.
+Any set with `{ type = "derivation"; }` counts as a derivation. 
+
+[var]``value``::
+The value which is possibly a derivation. 
+
+
+[[_function_library_lib.attrsets.isderivation_example_true]]
+.A package is a derivation
+====
+[source]
+----
+
+lib.attrsets.isDerivation (import <nixpkgs> {}).ruby
+=> true
+----
+====
+
+[[_function_library_lib.attrsets.isderivation_example_false]]
+.Anything else is not a derivation
+====
+[source]
+----
+
+lib.attrsets.isDerivation "foobar"
+=> false
+----
+====
+
+[[_function_library_lib.attrsets.toderivation]]
+== `` lib.attrsets.toDerivation``: `toDerivation {two-colons} Path -> Derivation`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Converts a store path to a fake derivation. 
+
+[var]``path``::
+A store path to convert to a derivation. 
+
+
+[[_function_library_lib.attrsets.optionalattrs]]
+== `` lib.attrsets.optionalAttrs``: `optionalAttrs {two-colons} Bool -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Conditionally return an attribute set or an empty attribute set. 
+
+[var]``cond``::
+Condition under which the [var]``as`` attribute set is returned. 
+
+[var]``as``::
+The attribute set to return if [var]``cond`` is true. 
+
+
+[[_function_library_lib.attrsets.optionalattrs_example_true]]
+.Return the provided attribute set when [var]``cond`` is true
+====
+[source]
+----
+
+lib.attrsets.optionalAttrs true { my = "set"; }
+=> { my = "set"; }
+----
+====
+
+[[_function_library_lib.attrsets.optionalattrs_example_false]]
+.Return an empty attribute set when [var]``cond`` is false
+====
+[source]
+----
+
+lib.attrsets.optionalAttrs false { my = "set"; }
+=> { }
+----
+====
+
+[[_function_library_lib.attrsets.zipattrswithnames]]
+== `` lib.attrsets.zipAttrsWithNames``: `zipAttrsWithNames {two-colons} [ String ] -> (String -> [ Any ] -> Any) -> [ AttrSet ] -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Merge sets of attributes and use the function [var]``f`` to merge attribute values where the attribute name is in [var]``names``. 
+
+[var]``names``::
+A list of attribute names to zip. 
+
+[var]``f``::
+`(String -> [ Any ] -> Any`
++
+Accepts an attribute name, all the values, and returns a combined value. 
+
+[var]``name``:::
+The name of the attribute each value came from. 
+
+[var]``vs``:::
+A list of values collected from the list of attribute sets. 
+
+[var]``sets``::
+A list of attribute sets to zip together. 
+
+
+[[_function_library_lib.attrsets.zipattrswithnames_example]]
+.Summing a list of attribute sets of numbers
+====
+[source]
+----
+
+lib.attrsets.zipAttrsWithNames
+  [ "a" "b" ]
+  (name: vals: "${name} ${toString (builtins.foldl' (a: b: a + b) 0 vals)}")
+  [
+    { a = 1; b = 1; c = 1; }
+    { a = 10; }
+    { b = 100; }
+    { c = 1000; }
+  ]
+=> { a = "a 11"; b = "b 101"; }
+----
+====
+
+[[_function_library_lib.attrsets.zipattrswith]]
+== `` lib.attrsets.zipAttrsWith``: `zipAttrsWith {two-colons} (String -> [ Any ] -> Any) -> [ AttrSet ] -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Merge sets of attributes and use the function [var]``f`` to merge attribute values.
+Similar to <<_function_library_lib.attrsets.zipattrswithnames>> where all key names are passed for [var]``names``. 
+
+[var]``f``::
+`(String -> [ Any ] -> Any`
++
+Accepts an attribute name, all the values, and returns a combined value. 
+
+[var]``name``:::
+The name of the attribute each value came from. 
+
+[var]``vs``:::
+A list of values collected from the list of attribute sets. 
+
+[var]``sets``::
+A list of attribute sets to zip together. 
+
+
+[[_function_library_lib.attrsets.zipattrswith_example]]
+.Summing a list of attribute sets of numbers
+====
+[source]
+----
+
+lib.attrsets.zipAttrsWith
+  (name: vals: "${name} ${toString (builtins.foldl' (a: b: a + b) 0 vals)}")
+  [
+    { a = 1; b = 1; c = 1; }
+    { a = 10; }
+    { b = 100; }
+    { c = 1000; }
+  ]
+=> { a = "a 11"; b = "b 101"; c = "c 1001"; }
+----
+====
+
+[[_function_library_lib.attrsets.zipattrs]]
+== `` lib.attrsets.zipAttrs``: `zipAttrsWith {two-colons} [ AttrSet ] -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Merge sets of attributes and combine each attribute value in to a list.
+Similar to <<_function_library_lib.attrsets.zipattrswith>> where the merge function returns a list of all values. 
+
+[var]``sets``::
+A list of attribute sets to zip together. 
+
+
+[[_function_library_lib.attrsets.zipattrs_example]]
+.Combining a list of attribute sets
+====
+[source]
+----
+
+lib.attrsets.zipAttrs
+  [
+    { a = 1; b = 1; c = 1; }
+    { a = 10; }
+    { b = 100; }
+    { c = 1000; }
+  ]
+=> { a = [ 1 10 ]; b = [ 1 100 ]; c = [ 1 1000 ]; }
+----
+====
+
+[[_function_library_lib.attrsets.recursiveupdateuntil]]
+== `` lib.attrsets.recursiveUpdateUntil``: `recursiveUpdateUntil {two-colons} ( [ String ] -> AttrSet -> AttrSet -> Bool ) -> AttrSet -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Does the same as the update operator `//` except that attributes are merged until the given predicate is verified.
+The predicate should accept 3 arguments which are the path to reach the attribute, a part of the first attribute set and a part of the second attribute set.
+When the predicate is verified, the value of the first attribute set is replaced by the value of the second attribute set. 
+
+[var]``pred``::
+`[ String ] -> AttrSet -> AttrSet -> Bool`
+
+[var]``path``:::
+The path to the values in the left and right hand sides. 
+
+[var]``l``:::
+The left hand side value. 
+
+[var]``r``:::
+The right hand side value. 
+
+[var]``lhs``::
+The left hand attribute set of the merge. 
+
+[var]``rhs``::
+The right hand attribute set of the merge. 
+
+
+[[_function_library_lib.attrsets.recursiveupdateuntil_example]]
+.Recursively merging two attribute sets
+====
+[source]
+----
+
+lib.attrsets.recursiveUpdateUntil (path: l: r: path == ["foo"])
+  {
+    # first attribute set
+    foo.bar = 1;
+    foo.baz = 2;
+    bar = 3;
+  }
+  {
+    #second attribute set
+    foo.bar = 1;
+    foo.quz = 2;
+    baz = 4;
+  }
+=> {
+  foo.bar = 1; # 'foo.*' from the second set
+  foo.quz = 2; #
+  bar = 3;     # 'bar' from the first set
+  baz = 4;     # 'baz' from the second set
+}
+----
+====
+
+[[_function_library_lib.attrsets.recursiveupdate]]
+== `` lib.attrsets.recursiveUpdate``: `recursiveUpdate {two-colons} AttrSet -> AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+A recursive variant of the update operator ``//``.
+The recursion stops when one of the attribute values is not an attribute set, in which case the right hand side value takes precedence over the left hand side value. 
+
+[var]``lhs``::
+The left hand attribute set of the merge. 
+
+[var]``rhs``::
+The right hand attribute set of the merge. 
+
+
+[[_function_library_lib.attrsets.recursiveupdate_example]]
+.Recursively merging two attribute sets
+====
+[source]
+----
+
+recursiveUpdate
+  {
+    boot.loader.grub.enable = true;
+    boot.loader.grub.device = "/dev/hda";
+  }
+  {
+    boot.loader.grub.device = "";
+  }
+=> {
+  boot.loader.grub.enable = true;
+  boot.loader.grub.device = "";
+}
+----
+====
+
+[[_function_library_lib.attrsets.recurseintoattrs]]
+== `` lib.attrsets.recurseIntoAttrs``: `recurseIntoAttrs {two-colons} AttrSet -> AttrSet`
+
+include::./locations.adoc[leveloffset=2]
+
+
+Make various Nix tools consider the contents of the resulting attribute set when looking for what to build, find, etc. 
+
+This function only affects a single attribute set; it does not apply itself recursively for nested attribute sets. 
+
+[var]``attrs``::
+An attribute set to scan for derivations. 
+
+
+[[_function_library_lib.attrsets.recurseintoattrs_example]]
+.Making Nix look inside an attribute set
+====
+[source]
+----
+
+{ pkgs ? import <nixpkgs> {} }:
+{
+  myTools = pkgs.lib.recurseIntoAttrs {
+    inherit (pkgs) hello figlet;
+  };
+}
+----
+====

@@ -1,0 +1,25 @@
+[[_sec_functions_library]]
+= Nixpkgs Library Functions
+
+
+Nixpkgs provides a standard library at [var]``pkgs.lib``, or through ``import <nixpkgs/lib>``. 
+
+include::./library/asserts.adoc[leveloffset=1]
+
+
+include::./library/attrsets.adoc[leveloffset=1]
+
+
+include::./library/generated/strings.adoc[leveloffset=1]
+
+
+include::./library/generated/trivial.adoc[leveloffset=1]
+
+
+include::./library/generated/lists.adoc[leveloffset=1]
+
+
+include::./library/generated/debug.adoc[leveloffset=1]
+
+
+include::./library/generated/options.adoc[leveloffset=1]

@@ -1,0 +1,83 @@
+[[_chap_quick_start]]
+= Quick Start to Adding a Package
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+:imagesdir: ./images
+
+
+To add a package to Nixpkgs: 
+
+. Checkout the Nixpkgs source tree: 
++
+----
+
+$ git clone https://github.com/NixOS/nixpkgs
+$ cd nixpkgs
+----
+. Find a good place in the Nixpkgs tree to add the Nix expression for your package. For instance, a library package typically goes into [path]``pkgs/development/libraries/pkgname`` , while a web browser goes into [path]``pkgs/applications/networking/browsers/pkgname`` . See <<_sec_organisation>> for some hints on the tree organisation. Create a directory for your package, e.g. 
++
+----
+
+$ mkdir pkgs/development/libraries/libfoo
+----
+. In the package directory, create a Nix expression -- a piece of code that describes how to build the package. In this case, it should be a _function_ that is called with the package dependencies as arguments, and returns a build of the package in the Nix store. The expression should usually be called [path]``default.nix`` . 
++
+----
+
+$ emacs pkgs/development/libraries/libfoo/default.nix
+$ git add pkgs/development/libraries/libfoo/default.nix
+----
++ 
+You can have a look at the existing Nix expressions under [path]``pkgs/``
+to see how it`'s done.
+Here are some good ones: 
++
+** GNU Hello: https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/misc/hello/default.nix[pkgs/applications/misc/hello/default.nix]. Trivial package, which specifies some [var]``meta`` attributes which is good practice. 
+** GNU cpio: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/archivers/cpio/default.nix[pkgs/tools/archivers/cpio/default.nix]. Also a simple package. The generic builder in [var]``stdenv`` does everything for you. It has no dependencies beyond [var]``stdenv``. 
+** GNU Multiple Precision arithmetic library (GMP): https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/libraries/gmp/5.1.x.nix[pkgs/development/libraries/gmp/5.1.x.nix]. Also done by the generic builder, but has a dependency on [var]``m4``. 
+** Pan, a GTK-based newsreader: https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/newsreaders/pan/default.nix[pkgs/applications/networking/newsreaders/pan/default.nix]. Has an optional dependency on [var]``gtkspell``, which is only built if [var]``spellCheck`` is ``true``. 
+** Apache HTTPD: https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/http/apache-httpd/2.4.nix[pkgs/servers/http/apache-httpd/2.4.nix]. A bunch of optional features, variable substitutions in the configure flags, a post-install hook, and miscellaneous hackery. 
+** Thunderbird: https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/mailreaders/thunderbird/default.nix[pkgs/applications/networking/mailreaders/thunderbird/default.nix]. Lots of dependencies. 
+** JDiskReport, a Java utility: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/misc/jdiskreport/default.nix[pkgs/tools/misc/jdiskreport/default.nix]. Nixpkgs doesn`'t have a decent [var]``stdenv`` for Java yet so this is pretty ad-hoc. 
+** XML::Simple, a Perl module: https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/perl-packages.nix[pkgs/top-level/perl-packages.nix] (search for the [var]``XMLSimple`` attribute). Most Perl modules are so simple to build that they are defined directly in [path]``perl-packages.nix`` ; no need to make a separate file for them. 
+** Adobe Reader: https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/misc/adobe-reader/default.nix[pkgs/applications/misc/adobe-reader/default.nix]. Shows how binary-only packages can be supported. In particular the https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/misc/adobe-reader/builder.sh[builder] uses [command]``patchelf`` to set the RUNPATH and ELF interpreter of the executables so that the right libraries are found at runtime. 
+
++ 
+Some notes: 
++
+** All [var]``meta`` attributes are optional, but it`'s still a good idea to provide at least the [var]``description``, [var]``homepage`` and [var]``license``. 
+** You can use [command]``nix-prefetch-url``[replaceable]``url`` to get the SHA-256 hash of source distributions. There are similar commands as [command]``nix-prefetch-git`` and [command]``nix-prefetch-hg`` available in `nix-prefetch-scripts` package. 
+** A list of schemes for `mirror://` URLs can be found in https://github.com/NixOS/nixpkgs/blob/master/pkgs/build-support/fetchurl/mirrors.nix[pkgs/build-support/fetchurl/mirrors.nix]. 
+
++ 
+The exact syntax and semantics of the Nix expression language, including the built-in function, are described in the Nix manual in the http://hydra.nixos.org/job/nix/trunk/tarball/latest/download-by-type/doc/manual/#chap-writing-nix-expressions[chapter on writing Nix expressions]. 
+. Add a call to the function defined in the previous step to https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/all-packages.nix[pkgs/top-level/all-packages.nix] with some descriptive name for the variable, e.g. [var]``libfoo``. 
++
+----
+
+$ emacs pkgs/top-level/all-packages.nix
+----
++ 
+The attributes in that file are sorted by category (like "`Development / Libraries`") that more-or-less correspond to the directory structure of Nixpkgs, and then by attribute name. 
+. To test whether the package builds, run the following command from the root of the nixpkgs source tree: 
++
+----
+
+$ nix-build -A libfoo
+----
+
+where [var]``libfoo`` should be the variable name defined in the previous step.
+You may want to add the flag [option]``-K`` to keep the temporary build directory in case something fails.
+If the build succeeds, a symlink [path]``./result``
+ to the package in the Nix store is created. 
+. If you want to install the package into your profile (optional), do 
++
+----
+
+$ nix-env -f . -iA libfoo
+----
+. Optionally commit the new package and open a pull request https://github.com/NixOS/nixpkgs/pulls[to nixpkgs], or use https://discourse.nixos.org/t/about-the-patches-category/477[ the Patches category] on Discourse for sending a patch without a GitHub account. 

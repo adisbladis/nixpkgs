@@ -1,0 +1,189 @@
+[[_sec_language_go]]
+= Go
+
+[[_ssec_go_modules]]
+== Go modules
+
+
+The function [var]`` buildGoModule `` builds Go programs managed with Go modules.
+It builds a https://github.com/golang/go/wiki/Modules[Go modules] through a two phase build: 
+
+* An intermediate fetcher derivation. This derivation will be used to fetch all of the dependencies of the Go module. 
+* A final derivation will use the output of the intermediate derivation to build the binaries and produce the final output. 
+
+
+[[_ex_buildgomodule]]
+.buildGoModule
+====
+[source]
+----
+
+pet = buildGoModule rec {
+  pname = "pet";
+  version = "0.3.4";
+
+  src = fetchFromGitHub {
+    owner = "knqyf263";
+    repo = "pet";
+    rev = "v${version}";
+    sha256 = "0m2fzpqxk7hrbxsgqplkg7h2p7gv6s1miymv3gvw0cz039skag0s";
+  };
+
+  modSha256 = "1879j77k96684wi554rkjxydrj8g3hpp0kvxz03sd8dmwr3lh83j"; 
+
+  subPackages = [ "." ]; 
+
+  meta = with lib; {
+    description = "Simple command-line snippet manager, written in Go";
+    homepage = "https://github.com/knqyf263/pet";
+    license = licenses.mit;
+    maintainers = with maintainers; [ kalbasit ];
+    platforms = platforms.linux ++ platforms.darwin;
+  };
+}
+----
+====
+
+<<_ex_buildgomodule>> is an example expression using buildGoModule, the following arguments are of special significance to the function: 
+
+      [var]``modSha256``
+ is the hash of the output of the intermediate fetcher derivation.
+     
+
+      [var]``subPackages``
+ limits the builder from building child packages that have not been listed. If [var]``subPackages``
+ is not specified, all child packages will be built.
+     
+
+[var]``modSha256`` can also take [var]``null`` as an input.
+When `null` is used as a value, the derivation won't be a fixed-output derivation but disable the build sandbox instead.
+This can be useful outside of nixpkgs where re-generating the modSha256 on each mod.sum changes is cumbersome, but will fail to build by Hydra, as builds with a disabled sandbox are discouraged. 
+
+[[_ssec_go_legacy]]
+== Go legacy
+
+
+The function [var]`` buildGoPackage `` builds legacy Go programs, not supporting Go modules. 
+
+[[_ex_buildgopackage]]
+.buildGoPackage
+====
+[source]
+----
+
+deis = buildGoPackage rec {
+  pname = "deis";
+  version = "1.13.0";
+
+  goPackagePath = "github.com/deis/deis"; 
+  subPackages = [ "client" ]; 
+
+  src = fetchFromGitHub {
+    owner = "deis";
+    repo = "deis";
+    rev = "v${version}";
+    sha256 = "1qv9lxqx7m18029lj8cw3k7jngvxs4iciwrypdy0gd2nnghc68sw";
+  };
+
+  goDeps = ./deps.nix; 
+
+  buildFlags = [ "--tags" "release" ]; 
+}
+----
+====
+
+<<_ex_buildgopackage>> is an example expression using buildGoPackage, the following arguments are of special significance to the function: 
+
+      [var]``goPackagePath``
+ specifies the package's canonical Go import path.
+     
+
+      [var]``subPackages``
+ limits the builder from building child packages that have not been listed. If [var]``subPackages``
+ is not specified, all child packages will be built.
+     
+
+      In this example only `github.com/deis/deis/client`
+ will be built.
+     
+
+      [var]``goDeps``
+ is where the Go dependencies of a Go program are listed as a list of package source identified by Go import path. It could be imported as a separate [var]``deps.nix``
+ file for readability. The dependency data structure is described below.
+     
+
+      [var]``buildFlags``
+ is a list of flags passed to the go build command.
+     
+
+The [var]``goDeps`` attribute can be imported from a separate [var]``nix`` file that defines which Go libraries are needed and should be included in [var]``GOPATH`` for [var]``buildPhase``. 
+
+[[_ex_godeps]]
+.deps.nix
+====
+[source]
+----
+
+[ 
+  {
+    goPackagePath = "gopkg.in/yaml.v2"; 
+    fetch = {
+      type = "git"; 
+      url = "https://gopkg.in/yaml.v2";
+      rev = "a83829b6f1293c91addabc89d0571c246397bbf4";
+      sha256 = "1m4dsmk90sbi17571h6pld44zxz7jc4lrnl4f27dpd1l8g5xvjhh";
+    };
+  }
+  {
+    goPackagePath = "github.com/docopt/docopt-go";
+    fetch = {
+      type = "git";
+      url = "https://github.com/docopt/docopt-go";
+      rev = "784ddc588536785e7299f7272f39101f7faccc3f";
+      sha256 = "0wwz48jl9fvl1iknvn9dqr4gfy1qs03gxaikrxxp9gry6773v3sj";
+    };
+  }
+]
+----
+====
+
+
+
+      [var]``goDeps``
+ is a list of Go dependencies.
+     
+
+      [var]``goPackagePath``
+ specifies Go package import path.
+     
+
+      [var]``fetch type``
+ that needs to be used to get package source. If [var]``git``
+ is used there should be [var]``url``
+, [var]``rev``
+ and [var]``sha256``
+ defined next to it.
+     
+
+To extract dependency information from a Go package in automated way use https://github.com/kamilchm/go2nix[go2nix].
+It can produce complete derivation and [var]``goDeps`` file for Go programs. 
+
+[var]``buildGoPackage`` produces <<_chap_multiple_output>> where [var]``bin`` includes program binaries.
+You can test build a Go binary as follows: 
+----
+
+$ nix-build -A deis.bin
+----
+
+or build all outputs with: 
+----
+
+$ nix-build -A deis.all
+----[var]``bin`` output will be installed by default with [var]``nix-env -i`` or [var]``systemPackages``. 
+
+You may use Go packages installed into the active Nix profiles by adding the following to your ~/.bashrc: 
+----
+for p in $NIX_PROFILES; do
+    GOPATH="$p/share/go:$GOPATH"
+done
+----
