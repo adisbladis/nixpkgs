@@ -22,7 +22,7 @@ let
     };
   };
 
-  sources = lib.sourceFilesBySuffices ./. [".xml"];
+  sources = lib.sourceFilesBySuffices ./. [".adoc"];
 
   modulesDoc = builtins.toFile "modules.xml" ''
     <section xmlns:xi="http://www.w3.org/2001/XInclude" id="modules">
@@ -72,61 +72,6 @@ let
     "--stringparam chunk.toc ${toc}"
   ];
 
-  manual-combined = runCommand "nixos-manual-combined"
-    { inherit sources;
-      nativeBuildInputs = [ buildPackages.libxml2.bin buildPackages.libxslt.bin ];
-      meta.description = "The NixOS manual as plain docbook XML";
-    }
-    ''
-      ${copySources}
-
-      xmllint --xinclude --output ./manual-combined.xml ./manual.xml
-      xmllint --xinclude --noxincludenode \
-         --output ./man-pages-combined.xml ./man-pages.xml
-
-      # outputs the context of an xmllint error output
-      # LEN lines around the failing line are printed
-      function context {
-        # length of context
-        local LEN=6
-        # lines to print before error line
-        local BEFORE=4
-
-        # xmllint output lines are:
-        # file.xml:1234: there was an error on line 1234
-        while IFS=':' read -r file line rest; do
-          echo
-          if [[ -n "$rest" ]]; then
-            echo "$file:$line:$rest"
-            local FROM=$(($line>$BEFORE ? $line - $BEFORE : 1))
-            # number lines & filter context
-            nl --body-numbering=a "$file" | sed -n "$FROM,+$LEN p"
-          else
-            if [[ -n "$line" ]]; then
-              echo "$file:$line"
-            else
-              echo "$file"
-            fi
-          fi
-        done
-      }
-
-      function lintrng {
-        xmllint --debug --noout --nonet \
-          --relaxng ${docbook5}/xml/rng/docbook/docbook.rng \
-          "$1" \
-          2>&1 | context 1>&2
-          # ^ redirect assumes xmllint doesn’t print to stdout
-      }
-
-      lintrng manual-combined.xml
-      lintrng man-pages-combined.xml
-
-      mkdir $out
-      cp manual-combined.xml $out/
-      cp man-pages-combined.xml $out/
-    '';
-
   olinkDB = runCommand "manual-olinkdb"
     { inherit sources;
       nativeBuildInputs = [ buildPackages.libxml2.bin buildPackages.libxslt.bin ];
@@ -157,44 +102,38 @@ let
       EOF
     '';
 
+  mkDocs = {
+    docType
+    , outFile
+  }: runCommand "nixos-manual-${docType}"
+    { inherit sources;
+      nativeBuildInputs = [ buildPackages.asciidoctor ];
+      meta.description = "The NixOS manual in HTML format";
+      allowedReferences = ["out"];
+    }
+    ''
+      dst=$out/share/doc/nixos
+      mkdir -p $dst
+
+      type -p asciidoctor
+      asciidoctor --doctype book -o $dst/${outFile} -a source-highlighter=rouge -b ${docType} -vvv --trace ${sources}/manual.adoc
+
+      mkdir -p $out/nix-support
+      echo "nix-build out $out" >> $out/nix-support/hydra-build-products
+      echo "doc manual $dst" >> $out/nix-support/hydra-build-products
+    ''; # */
+
+
 in rec {
   inherit generatedSources;
 
   inherit (optionsDoc) optionsJSON optionsXML optionsDocBook;
 
   # Generate the NixOS manual.
-  manualHTML = runCommand "nixos-manual-html"
-    { inherit sources;
-      nativeBuildInputs = [ buildPackages.libxml2.bin buildPackages.libxslt.bin ];
-      meta.description = "The NixOS manual in HTML format";
-      allowedReferences = ["out"];
-    }
-    ''
-      # Generate the HTML manual.
-      dst=$out/share/doc/nixos
-      mkdir -p $dst
-      xsltproc \
-        ${manualXsltprocOptions} \
-        --stringparam target.database.document "${olinkDB}/olinkdb.xml" \
-        --stringparam id.warnings "1" \
-        --nonet --output $dst/ \
-        ${docbook_xsl_ns}/xml/xsl/docbook/xhtml/chunktoc.xsl \
-        ${manual-combined}/manual-combined.xml \
-        |& tee xsltproc.out
-      grep "^ID recommended on" xsltproc.out &>/dev/null && echo "error: some IDs are missing" && false
-      rm xsltproc.out
-
-      mkdir -p $dst/images/callouts
-      cp ${docbook_xsl_ns}/xml/xsl/docbook/images/callouts/*.svg $dst/images/callouts/
-
-      cp ${../../../doc/style.css} $dst/style.css
-      cp ${../../../doc/overrides.css} $dst/overrides.css
-      cp -r ${pkgs.documentation-highlighter} $dst/highlightjs
-
-      mkdir -p $out/nix-support
-      echo "nix-build out $out" >> $out/nix-support/hydra-build-products
-      echo "doc manual $dst" >> $out/nix-support/hydra-build-products
-    ''; # */
+  manualHTML = mkDocs {
+    docType = "html5";
+    outFile = "index.html";
+  };
 
   # Alias for backward compatibility. TODO(@oxij): remove eventually.
   manual = manualHTML;
@@ -202,34 +141,12 @@ in rec {
   # Index page of the NixOS manual.
   manualHTMLIndex = "${manualHTML}/share/doc/nixos/index.html";
 
-  manualEpub = runCommand "nixos-manual-epub"
-    { inherit sources;
-      buildInputs = [ libxml2.bin libxslt.bin zip ];
-    }
-    ''
-      # Generate the epub manual.
-      dst=$out/share/doc/nixos
-
-      xsltproc \
-        ${manualXsltprocOptions} \
-        --stringparam target.database.document "${olinkDB}/olinkdb.xml" \
-        --nonet --xinclude --output $dst/epub/ \
-        ${docbook_xsl_ns}/xml/xsl/docbook/epub/docbook.xsl \
-        ${manual-combined}/manual-combined.xml
-
-      mkdir -p $dst/epub/OEBPS/images/callouts
-      cp -r ${docbook_xsl_ns}/xml/xsl/docbook/images/callouts/*.svg $dst/epub/OEBPS/images/callouts # */
-      echo "application/epub+zip" > mimetype
-      manual="$dst/nixos-manual.epub"
-      zip -0Xq "$manual" mimetype
-      cd $dst/epub && zip -Xr9D "$manual" *
-
-      rm -rf $dst/epub
-
-      mkdir -p $out/nix-support
-      echo "doc-epub manual $manual" >> $out/nix-support/hydra-build-products
-    '';
-
+  # TODO: Currently fails with:
+  # asciidoctor: FAILED: missing converter for backend 'epub'
+  manualEpub = mkDocs {
+    docType = "epub";
+    outFile = "nixos-manual.epub";
+  };
 
   # Generate the NixOS manpages.
   manpages = runCommand "nixos-manpages"
