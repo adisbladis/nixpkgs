@@ -1,0 +1,442 @@
+#!/usr/bin/env nix-shell
+#! nix-shell -i python3
+from concurrent.futures import ThreadPoolExecutor
+from concurrent import futures
+from lxml import etree
+import subprocess
+import argparse
+import os.path
+import json
+import sys
+import os
+import re
+from pprint import pprint
+
+
+# Map format name to file extension
+FORMATS = {
+    "asciidoc": "adoc",
+    "markdown": "md",
+    "docbook": "xml",
+}
+
+EXT_FROM = (FORMATS["docbook"], FORMATS["markdown"])
+
+
+SECTION_PREFIX = """<section xmlns="http://docbook.org/ns/docbook"
+xmlns:xlink="http://www.w3.org/1999/xlink"
+xmlns:xi="http://www.w3.org/2001/XInclude"
+xml:id="sec-pkgs-appimageTools">"""
+SECTION_SUFFIX = "</section>"
+
+
+class SerialExecutor:
+    """Implement some of the futures interface for easier debugging"""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        pass
+
+    @staticmethod
+    def submit(*args):
+
+        class SerialFut:
+            def __init__(self, *args):
+                self._args = args
+
+            def result(self):
+                args = self._args
+                return args[0](*args[1:])
+
+        return SerialFut(*args)
+
+
+def clean_pandoc_result(filename):
+    """
+    Pandoc has some weirdness in it's output that we need to strip
+    """
+
+    with open(filename) as f:
+        data = f.read()
+
+    data = re.sub(r"`\+(.*?)\+`", r"`\1`", data)
+
+    with open(filename, "w") as f:
+        f.write(data)
+
+
+def convert_callouts(file_from, filename):
+    """
+    docbookrx comments out callouts as it does not know what to do with them
+    this method converts commented out docbook callouts to asciidoc callouts
+    """
+
+    with open(filename) as f:
+        data = f.read()
+
+    if "<calloutlist>" not in data:
+        return
+
+    # Create chunk of comment sections containing callout lists
+    chunks = []
+    in_chunk = False
+    chunk = []
+    for l in data.split("\n"):
+        if "<calloutlist>" in l:
+            in_chunk = True
+            chunk.append(l.lstrip("// "))
+        elif "</calloutlist>" in l:
+            in_chunk = False
+            chunk.append(l.lstrip("// "))
+            chunks.append(chunk)
+            chunk = []
+            continue
+        elif in_chunk:
+            chunk.append(l.lstrip("// "))
+        else:
+            chunks.append(l)
+
+    # Map callout names to index
+    callouts = {}
+
+    # Convert callouts to asciidoc format
+    result = []
+    for chunk in chunks:
+        if not isinstance(chunk, list):
+            result.append(chunk)
+            continue
+
+        chunk = "\n".join(chunk)
+
+        # root = etree.fromstring(chunk)
+        # roots = [ 1 ]
+        roots = etree.fromstring(SECTION_PREFIX + chunk + SECTION_SUFFIX)
+        paras = []
+        idx = 1
+        for root in roots:
+            for elem in root:
+                if elem.tag != "{http://docbook.org/ns/docbook}callout":
+                    raise ValueError(f"Dont know how to handle tag: {elem.tag}")
+
+                callout_id = elem.get("arearefs")
+                if not callout_id:
+                    raise ValueError("No callout id")
+
+                for sub in elem:
+                    if sub.tag == "{http://docbook.org/ns/docbook}para":
+                        para = f"<{idx}> "
+                        callouts[callout_id] = idx
+                        idx += 1
+
+                        head = str(sub.text.lstrip('\n'))
+                        para += head
+
+                        for var in sub:
+                            if var.tag == "{http://docbook.org/ns/docbook}varname":
+                                para += f"`{var.text}`{var.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}emphasis":
+                                para += f"`_{var.text}`_{var.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}literal":
+                                para += f"`_{var.text}`_{var.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}xref":
+                                link = var.get("linkend")
+                                para += f"<<{link}>>{var.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}filename":
+                                para += f"`{var.text}`{var.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}command":
+                                para += f"`_{var.text}_`{var.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}note":
+                                __para = ''
+                                for _para in var:
+                                    __para += _para.text
+                                    for _tag in _para:
+                                        if _tag.tag != '{http://docbook.org/ns/docbook}literal':
+                                            raise ValueError(_tag.tag)
+                                        __para += f'`{_tag.text}`{_tag.tail}'
+                                para += __para
+                            elif var.tag == "{http://docbook.org/ns/docbook}link":
+                                link = var.get('{http://www.w3.org/1999/xlink}href')
+                                para += "{link}[{var.text}]"
+                            elif var.tag == "{http://docbook.org/ns/docbook}itemizedlist":
+                                for listitem in var:
+                                    for _para in listitem:
+                                        para += f"`{_para.text}{_para.tail}"
+                            elif var.tag == "{http://docbook.org/ns/docbook}programlisting":
+                                para += "[source]\n---\n"
+                                para += sub.text
+                                para += "\n---\n"
+                            else:
+                                raise ValueError(var.tag)
+
+                    elif sub.tag == "{http://docbook.org/ns/docbook}programlisting":
+                        para += "[source]\n---\n"
+                        para += sub.text
+                        para += "\n---\n"
+
+                    else:
+                        raise ValueError(f"Dont know how to handle tag: {sub.tag}")
+
+                paras.append(para)
+        result.append("\n".join(paras))
+
+    # Inject callout references in asciidoc
+    prev = None
+    with open(file_from) as f:
+        file_from_data = f.read()
+        file_from_lines = file_from_data.split("\n")
+
+        root = etree.fromstring(file_from_data)
+        for elem in root.iter("{http://docbook.org/ns/docbook}programlisting"):
+            for e in elem:
+                if e.tag != "{http://docbook.org/ns/docbook}co":
+                    continue
+
+                callout_id = e.get("{http://www.w3.org/XML/1998/namespace}id")
+                callout_idx = callouts[callout_id]
+
+                # Find open tag, some elements are split over multiple lines
+                sourceline = e.sourceline - 1
+                line = file_from_lines[sourceline]
+                while "<" not in line:
+                    line = file_from_lines[sourceline]
+                    sourceline -= 1
+
+                prefix = line.split("<co")[0]
+                result = [
+                    (l + f"  # <{callout_idx}>") if l.startswith(prefix) else l
+                    for l in result
+                ]
+
+    result = "\n".join(result).split("\n")
+    result_final = result
+
+    # Ensure callouts has a leading newline
+    result_final = []
+    for idx, l in enumerate(result):
+        if re.match('^<\d+>.+$', l):
+            if result[idx-1].strip() != '':
+                pass
+            result_final.append('')
+        result_final.append(l)
+
+    result = "\n".join(result_final)
+    with open(filename, "w") as f:
+        f.write(result)
+
+
+def convert_includes(filename):
+    """
+    Yet again we have some commented out loss in conversion...
+    """
+
+    with open(filename) as f:
+        data = f.read()
+
+    # Create chunk of comment sections containing callout lists
+    chunks = []
+    in_chunk = False
+    chunk = []
+    for l in data.split("\n"):
+        if l.startswith('//'):
+            in_chunk = True
+            chunk.append(l.lstrip("// "))
+        else:
+            if in_chunk:
+                chunks.append(chunk)
+            chunks.append(l)
+            in_chunk = False
+            chunk = []
+
+    result = []
+    for chunk in chunks:
+
+        if not isinstance(chunk, list):
+            result.append(chunk)
+            continue
+
+        try:
+            roots = etree.fromstring(SECTION_PREFIX + '\n'.join(chunk) + SECTION_SUFFIX)
+        except etree.XMLSyntaxError:
+            # If syntax error leave commented out to prevent loss
+            result.append('\n'.join('// ' + l for l in chunk))
+            raise
+            continue
+
+        for root in roots:
+            if root.tag == 'citerefentry':
+                part = ''
+                for sub in root:
+                    if sub.tag == "refentrytitle":
+                        part += f'`{sub.text}`'
+                    elif sub.tag == "manvolnum":
+                        part = part[:-1] + f'({sub.text})`'
+                    else:
+                        raise ValueError(sub.tag)
+                continue
+
+            elif root.tag == '{http://docbook.org/ns/docbook}citerefentry':
+                continue
+            elif root.tag == '{http://docbook.org/ns/docbook}refentry':
+                continue
+            elif root.tag == '{http://docbook.org/ns/docbook}reference':
+                continue
+            elif root.tag == '{http://docbook.org/ns/docbook}inlineequation':
+                continue
+            elif root.tag == "{http://www.w3.org/1999/XSL/Transform}stylesheet":
+                continue  # Drop
+
+            elif root.tag != '{http://docbook.org/ns/docbook}part':
+                raise ValueError(f'Encountered {root.tag} in {filename}')
+
+            part = ''
+            for elem in root:
+                if elem.tag == "{http://docbook.org/ns/docbook}title":
+                    part += f'# {elem.text}\n'
+                elif elem.tag == "{http://docbook.org/ns/docbook}partintro":
+                    _id = elem.get('{http://www.w3.org/XML/1998/namespace}id')
+                    part += f'[partintro#{_id}]\n'
+
+                    for sub in elem:
+                        if sub.tag == '{http://docbook.org/ns/docbook}para':
+                            for ssub in sub:
+                                if ssub.tag == "{http://docbook.org/ns/docbook}xref":
+                                    link = ssub.get("linkend")
+                                    part += f"<<{link}>>{ssub.tail}"
+                                elif ssub.tag == "{http://docbook.org/ns/docbook}filename":
+                                    part += f"`{ssub.text}`{ssub.tail}"
+                                elif ssub.tag == "{http://docbook.org/ns/docbook}command":
+                                    part += f"`_{ssub.text}`_{ssub.tail}"
+                                else:
+                                    raise ValueError(ssub.tag)
+
+                        else:
+                            raise ValueError(sub.tag)
+
+                    part += '\n'
+
+                elif elem.tag == "{http://www.w3.org/2001/XInclude}include":
+                    xpointer = elem.get('xpointer')
+                    if xpointer:
+                        print('TODO: What to do about xpointers?')
+                    _file = elem.get('href').replace('.xml', '.adoc')
+                    part += f'include::{_file}[]\n'
+
+                elif elem.tag is etree.Comment:
+                    continue
+
+                else:
+                    raise ValueError(elem.tag)
+
+            result.append(part)
+
+    with open(filename, 'w') as f:
+        f.write('\n'.join(result))
+
+
+def convert_docbook(filename):
+    # Docbookrx cant convert man pages, these needs manual conversion
+    if filename.startswith("man-"):
+        return None
+
+    fname, ext = os.path.splitext(filename)
+    file_to = ".".join((fname, ext_to))
+
+    p = subprocess.run(
+        ["suserx", filename,], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+
+    # Suserx comes with a ton of bugfixes and better conversion but also crashes on me
+    # Since I'm not interested in going down the ruby rabbit hole any further lets just hack it up
+    if p.returncode != 0:
+        p = subprocess.run(
+            ["docbookrx", filename,], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+
+    # If docbookrx failed (only one file failed during my testing) fall back to using pandoc
+    if p.returncode != 0:
+        with open(filename) as f:
+            data = f.read()
+            if "xi:include" in data:
+                sys.stdout.buffer.write(p.stdout)
+                sys.stderr.buffer.write(p.stderr)
+                raise ValueError(
+                    f"{filename}: xi:include is unsupported by pandoc and silently dropped"
+                )
+
+        # Even though pandoc results are subpar we're better off with a conversion than no conversion
+        p = subprocess.run(
+            [
+                "pandoc",
+                filename,
+                "-f",
+                "docbook",
+                "-t",
+                "asciidoc",
+                "-s",
+                filename,
+                "-o",
+                file_to,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        clean_pandoc_result(file_to)
+
+    convert_callouts(filename, file_to)
+    convert_includes(file_to)
+
+    return (file_to, p)
+
+
+def find_doc_files():
+    for d in ("nixos/doc", "doc"):
+        p = subprocess.run(["git", "ls-files", d], check=True, stdout=subprocess.PIPE,)
+
+        for f in p.stdout.decode().split("\n"):
+            if f and any(f.endswith(EXT) for EXT in EXT_FROM):
+                yield f
+
+
+def convert_markdown(filename):
+    return (filename.replace('md', 'adoc'), subprocess.run(["kramdoc", filename], stderr=subprocess.PIPE))
+
+
+if __name__ == "__main__":
+
+    argparser = argparse.ArgumentParser()
+    args = argparser.parse_args()
+
+    fmt_to = "asciidoc"
+    ext_to = FORMATS[fmt_to]
+
+    with ThreadPoolExecutor() as e:
+    # with SerialExecutor() as e:
+        futs = []
+
+        for f in find_doc_files():
+
+            # if f != 'doc/manual.xml':
+            #     continue
+
+            _, ext = os.path.splitext(f)
+            if ext == '.xml':
+                futs.append(e.submit(convert_docbook, f))
+            elif ext == '.md':
+                futs.append(e.submit(convert_markdown, f))
+
+        for fut in futs:
+
+            filename, p = fut.result()
+            if p.returncode != 0:
+                sys.stderr.write(f"{filename} failed:\n\n")
+                # sys.stderr.buffer.write(p.stderr)
+                continue
+                exit(1)
+
+            if f:
+                print(f"Wrote {filename}")
+            else:
+                print(f"Skipped {filename}")
