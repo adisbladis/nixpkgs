@@ -151,21 +151,21 @@ in rec {
   # Generate the NixOS manpages.
   manpages = runCommand "nixos-manpages"
     { inherit sources;
-      nativeBuildInputs = [ buildPackages.libxml2.bin buildPackages.libxslt.bin ];
+      nativeBuildInputs = [ buildPackages.asciidoctor ];
       allowedReferences = ["out"];
     }
     ''
-      # Generate manpages.
-      mkdir -p $out/share/man
-      xsltproc --nonet \
-        --maxdepth 6000 \
-        --param man.output.in.separate.dir 1 \
-        --param man.output.base.dir "'$out/share/man/'" \
-        --param man.endnotes.are.numbered 0 \
-        --param man.break.after.slash 1 \
-        --stringparam target.database.document "${olinkDB}/olinkdb.xml" \
-        ${docbook_xsl_ns}/xml/xsl/docbook/manpages/docbook.xsl \
-        ${manual-combined}/man-pages-combined.xml
+      cp $sources/man-*.adoc .
+      rm man-nixos-generate-config.adoc # Has problems, needs fixup
+      rm man-pages.adoc # Has problems, needs fixup
+      asciidoctor --failure-level=INFO -b manpage *.adoc
+
+      find . -maxdepth 1 -regex '.*\.[0-9]' | while read man; do
+        level=$(echo $man | grep -Po '[0-9]$')
+        outd=$out/share/man/man$level
+        mkdir -p $outd
+        cp $man $outd/
+      done
     '';
 
 }
