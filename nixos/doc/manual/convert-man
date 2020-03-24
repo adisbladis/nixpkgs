@@ -1,0 +1,360 @@
+#!/usr/bin/env nix-shell
+#! nix-shell -i python3 -p python3 -p python3.pkgs.lxml
+from concurrent.futures import ThreadPoolExecutor
+from concurrent import futures
+from lxml import etree
+import textwrap
+import subprocess
+import argparse
+import os.path
+import json
+import sys
+import os
+import re
+from pprint import pprint
+
+
+class SerialExecutor:
+    """Implement some of the futures interface for easier debugging"""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        pass
+
+    @staticmethod
+    def submit(*args):
+
+        class SerialFut:
+            def __init__(self, *args):
+                self._args = args
+
+            def result(self):
+                args = self._args
+                return args[0](*args[1:])
+
+        return SerialFut(*args)
+
+
+def dictcopy(dict_ish):
+    return {
+        k: v
+        for k, v in dict_ish.items()
+    }
+
+
+def dedent(s: str) -> str:
+    """Dedent and strip leading & ending line"""
+    return textwrap.dedent(s)[1:][:-1]
+
+
+def handle_arg(elem):
+    replaceable = ''
+    options = []
+
+    for opt in elem:
+
+        if opt.tag == '{http://docbook.org/ns/docbook}option':
+            options.append(opt.text)
+        elif opt.tag == '{http://docbook.org/ns/docbook}replaceable':
+            replaceable = opt.text
+        elif opt.tag == '{http://docbook.org/ns/docbook}group':
+            for a in opt:
+                for o in a:
+                    options.append(o.text)
+        elif opt.tag == '{http://docbook.org/ns/docbook}arg':
+            for o in opt:
+                options.append(o.text)
+
+        else:
+            raise ValueError(opt)
+
+    ret = '['
+
+    if len(options) > 1:
+        ret += '{ ' + ' | '.join(options) + ' }'
+    else:
+        ret += ''.join(options)
+
+    if replaceable:
+        ret += f' {replaceable}'
+
+    ret += ']'
+
+    return ret
+
+
+def handle_refmeta(root):
+    volnum = ''
+    command = ''
+    source = ''
+
+    for elem in root:
+        if elem.tag == '{http://docbook.org/ns/docbook}refentrytitle':
+            for e in elem:
+                command = e.text
+
+        elif elem.tag == '{http://docbook.org/ns/docbook}manvolnum':
+            volnum = elem.text
+
+        elif elem.tag == '{http://docbook.org/ns/docbook}refmiscinfo':
+            if elem.attrib['class'] != 'source':
+                raise ValueError(elem)
+
+            source = elem.text
+
+        else:
+            if type(elem.tag()) != etree._Comment:
+              raise ValueError(elem.tag)
+
+    return dedent(f"""
+    = {command}({volnum})
+    :doctype: manpage
+    :manvolnum: {volnum}
+    :manmanual: {command}
+    :mansource: {source}
+    """)
+
+
+def handle_refnamediv(root):
+    command = ''
+    purpose = ''
+
+    for elem in root:
+        if elem.tag == '{http://docbook.org/ns/docbook}refname':
+            for e in elem:
+                command = e.text
+
+        elif elem.tag == '{http://docbook.org/ns/docbook}refpurpose':
+            purpose = elem.text
+
+        else:
+            raise ValueError(elem)
+
+    return dedent(f"""
+    == NAME
+
+    {command} - {purpose}
+    """)
+
+
+def handle_refsynopsisdiv(root):
+    command = ''
+
+    def handle_group(elem):
+        args = []
+        for sub in elem:
+            if sub.tag != '{http://docbook.org/ns/docbook}arg':
+                raise ValueError(sub)
+
+            for opt in sub:
+                if opt.tag != '{http://docbook.org/ns/docbook}option':
+                    raise ValueError(opt)
+                args.append(opt.text)
+
+        return '{ ' + ' | '.join(args) + ' }'
+
+    retval = ''
+    for elem in root:
+        if elem.tag == '{http://docbook.org/ns/docbook}cmdsynopsis':
+            for sub in elem:
+
+                if sub.tag == '{http://docbook.org/ns/docbook}command':
+                    command = sub.text
+
+                elif sub.tag == '{http://docbook.org/ns/docbook}arg':
+                    retval += handle_arg(sub) + ' '
+
+                elif sub.tag == '{http://docbook.org/ns/docbook}group':
+                    retval += handle_group(sub) + ' '
+
+                elif sub.tag == '{http://docbook.org/ns/docbook}sbr':
+                    continue  # SBR does not have semantic meaning
+
+                else:
+                    raise ValueError(sub)
+
+    return dedent("""
+    == SYNOPSIS
+
+
+    """) + retval
+
+
+
+def handle_refsection(root):
+    lines = [ root.text ]
+
+    def handle_varlistentry(root):
+
+        def handle_para(root):
+            retval = root.text
+
+            for elem in root:
+
+                if elem.tag == '{http://docbook.org/ns/docbook}command':
+                    retval += f"`_{elem.text}_`{elem.tail}"
+
+                elif elem.tag == '{http://docbook.org/ns/docbook}filename':
+                    retval += f"`{elem.text}`{elem.tail}"
+
+                elif elem.tag == '{http://docbook.org/ns/docbook}screen':
+                    for prompt in elem:
+                        retval += f'    {prompt.text} {prompt.tail}'
+
+                elif elem.tag == '{http://docbook.org/ns/docbook}option':
+                    retval += f"*{elem.text}*{elem.tail}"
+
+                elif elem.tag == '{http://docbook.org/ns/docbook}literal':
+                    retval += f"`{elem.text}`{elem.tail}"
+
+                else:
+                    if not isinstance(elem.tag, str) and type(elem.tag()) != etree._Comment:
+                        raise ValueError(elem.tag)
+
+            return retval
+
+        ret = root.text
+        for elem in root:
+            if elem.tag == '{http://docbook.org/ns/docbook}term':
+                for sub in elem:
+                    if sub.tag == '{http://docbook.org/ns/docbook}option':
+                        ret += f'*{sub.text}*{sub.tail}'
+                    elif sub.tag == '{http://docbook.org/ns/docbook}replaceable':
+                        ret += f'{sub.text}{sub.tail}'
+                    elif sub.tag == '{http://docbook.org/ns/docbook}envar':
+                        ret += f'*{sub.text}*{sub.tail}'
+                    elif sub.tag == '{http://docbook.org/ns/docbook}filename':
+                        ret += f"`{sub.text}`{sub.tail}"
+                    elif sub.tag == "{http://docbook.org/ns/docbook}literal":
+                        ret += f"`_{sub.text}`_{sub.tail}"
+                    else:
+                        raise ValueError(sub)
+
+            elif elem.tag == '{http://docbook.org/ns/docbook}listitem':
+                for sub in elem:
+                    if sub.tag != '{http://docbook.org/ns/docbook}para':
+                        raise ValueError(sub)
+                    ret += handle_para(sub)
+
+            else:
+                raise ValueError(elem)
+
+        ret += root.tail
+
+        return ret
+
+    for elem in root:
+        if elem.tag == '{http://docbook.org/ns/docbook}title':
+            lines.append(f'== ' + elem.text)
+
+        elif elem.tag == '{http://docbook.org/ns/docbook}para':
+            para = elem.text
+            for sub in elem:
+                if sub.tag == '{http://docbook.org/ns/docbook}filename':
+                    para += f"`{sub.text}`{sub.tail}"
+                elif sub.tag == "{http://docbook.org/ns/docbook}command":
+                    para += f"`_{sub.text}_`{sub.tail}"
+                elif sub.tag == '{http://docbook.org/ns/docbook}option':
+                    para += f"*{sub.text}*{sub.tail}"
+                elif sub.tag == '{http://docbook.org/ns/docbook}citerefentry':
+                    for e in sub:
+                        if e.tag == '{http://docbook.org/ns/docbook}refentrytitle':
+                            ref = e.text
+                        elif e.tag == '{http://docbook.org/ns/docbook}manvolnum':
+                            volnum = e.text
+                    para += f"*{ref}*({volnum})"
+                elif sub.tag == '{http://docbook.org/ns/docbook}screen':
+                    for prompt in sub:
+                        para += f'    {prompt.text} {prompt.tail}'
+
+                elif sub.tag == '{http://docbook.org/ns/docbook}variablelist':
+                    for e in sub:
+                        if e.tag != '{http://docbook.org/ns/docbook}varlistentry':
+                            raise ValueError(e)
+                        para += handle_varlistentry(e)
+
+                elif sub.tag == '{http://docbook.org/ns/docbook}programlisting':
+                    para += "[source,nix]\n---\n"
+                    para += sub.text
+                    para += "\n---\n"
+                elif sub.tag == "{http://docbook.org/ns/docbook}emphasis":
+                    para += f"`_{sub.text}`_{sub.tail}"
+                elif sub.tag == "{http://docbook.org/ns/docbook}itemizedlist":
+                    for listitem in sub:
+                        for _para in listitem:
+                            para += f"`{_para.text}{_para.tail}"
+                elif sub.tag == '{http://docbook.org/ns/docbook}literal':
+                    para += f"`{sub.text}`{sub.tail}"
+                elif sub.tag == "{http://docbook.org/ns/docbook}varname":
+                    para += f"`{sub.text}`{sub.tail}"
+                else:
+                    raise ValueError(sub)
+
+            lines.append(para + '\n')
+        else:
+            if elem.tag == '{http://docbook.org/ns/docbook}variablelist':
+                for sub in elem:
+                    lines.append(handle_varlistentry(sub))
+
+            elif elem.tag == '{http://www.w3.org/2001/XInclude}include':
+                sys.stderr.write('TODO: Handle includes\n')
+                sys.stderr.flush()
+                continue
+
+            elif elem.tag == '{http://docbook.org/ns/docbook}screen':
+                for prompt in elem:
+                    retval += f'    {prompt.text} {prompt.tail}'
+
+            else:
+                raise ValueError(elem)
+
+    return '\n'.join(lines)
+
+
+def convert_man(file_from, file_to):
+    with open(file_from) as f:
+        root = etree.fromstring(f.read())
+
+    for root in root.iter("{http://docbook.org/ns/docbook}refentry"):
+        for sub in root:
+            if sub.tag == '{http://docbook.org/ns/docbook}refmeta':
+                yield handle_refmeta(sub)
+            elif sub.tag == '{http://docbook.org/ns/docbook}refnamediv':
+                yield handle_refnamediv(sub)
+            elif sub.tag == '{http://docbook.org/ns/docbook}refsynopsisdiv':
+                yield handle_refsynopsisdiv(sub)
+            elif sub.tag == '{http://docbook.org/ns/docbook}refsection':
+                yield handle_refsection(sub)
+            elif sub.tag == '{http://docbook.org/ns/docbook}refentry':
+                pass
+            else:
+                raise ValueError(f'Unhandled tag {f.tag}')
+
+
+if __name__ == "__main__":
+
+    argparser = argparse.ArgumentParser()
+    args = argparser.parse_args()
+
+    with ThreadPoolExecutor() as e:
+        futs = []
+
+        for f in os.listdir('.'):
+            if not f.startswith('man-'):
+                continue
+            if not f.endswith('.xml'):
+                continue
+
+            # if f != 'man-nixos-generate-config.xml':
+            #     continue
+
+            print(f)
+
+            file_from = f
+            file_to = os.path.splitext(f)[0] + '.adoc'
+
+            man = '\n\n'.join(convert_man(file_from, file_to))
+            with open(file_to, 'w') as f:
+                f.write(man)
