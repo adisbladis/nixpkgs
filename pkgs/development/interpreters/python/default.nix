@@ -17,9 +17,15 @@ with pkgs;
     , pythonForBuild
     , self
     }: let
+      isPy2 = lib.strings.substring 0 1 pythonVersion == "2";
       pythonPackages = callPackage ../../../top-level/python-packages.nix {
         python = self;
-        overrides = packageOverrides;
+        overrides =
+          if isPy2 then (lib.foldr lib.composeExtensions (self: super: {}) [
+            (callPackage ../../../top-level/python-2-packages.nix {})
+            packageOverrides
+          ])
+          else packageOverrides;
       };
     in rec {
         isPy27 = pythonVersion == "2.7";
@@ -30,7 +36,7 @@ with pkgs;
         isPy37 = pythonVersion == "3.7";
         isPy38 = pythonVersion == "3.8";
         isPy39 = pythonVersion == "3.9";
-        isPy2 = lib.strings.substring 0 1 pythonVersion == "2";
+        inherit isPy2;
         isPy3 = lib.strings.substring 0 1 pythonVersion == "3";
         isPy3k = isPy3;
         isPyPy = lib.hasInfix "pypy" interpreter;
