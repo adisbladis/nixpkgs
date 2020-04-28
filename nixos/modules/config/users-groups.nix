@@ -354,17 +354,49 @@ let
     };
   };
 
+  # Create default ranges for `isNormalUser = true`
+  mkDefaultRanges = users: builtins.listToAttrs (
+    (
+      builtins.foldl' (
+        acc: user: {
+          values = acc.values ++ [
+            {
+              name = user;
+              value = {
+                subUidRanges = [ { startUid = acc.offset; count = 65536; } ];
+                subGidRanges = [ { startGid = acc.offset; count = 65536; } ];
+              };
+            }
+          ];
+          offset = acc.offset + 65536;
+        }
+      )
+      { values = []; offset = 100000; }
+      (lib.attrNames (lib.filterAttrs (n: v: v.isNormalUser) users))
+    ).values
+  );
+  defaultRangeUsers = lib.mapAttrs (n: v: let
+    user = cfg.users.${n};
+  in user // {
+    subUidRanges = user.subUidRanges ++ v.subUidRanges;
+    subGidRanges = user.subGidRanges ++ v.subGidRanges;
+  }) (mkDefaultRanges cfg.users);
+
   mkSubuidEntry = user: concatStrings (
     map (range: "${user.name}:${toString range.startUid}:${toString range.count}\n")
       user.subUidRanges);
 
-  subuidFile = concatStrings (map mkSubuidEntry (attrValues cfg.users));
+  subuidFile = concatStrings (map mkSubuidEntry (attrValues defaultRangeUsers));
+
+  # subuidFile = "";
 
   mkSubgidEntry = user: concatStrings (
     map (range: "${user.name}:${toString range.startGid}:${toString range.count}\n")
         user.subGidRanges);
 
-  subgidFile = concatStrings (map mkSubgidEntry (attrValues cfg.users));
+  subgidFile = concatStrings (map mkSubgidEntry (attrValues defaultRangeUsers));
+
+  # subgidFile = "";
 
   idsAreUnique = set: idAttr: !(fold (name: args@{ dup, acc }:
     let
