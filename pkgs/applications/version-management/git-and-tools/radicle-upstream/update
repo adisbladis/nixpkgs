@@ -1,0 +1,33 @@
+#!/usr/bin/env nix-shell
+#!nix-shell -I nixpkgs=../../../../../ -i bash -p nix-prefetch-git yarn2nix nix jq crate2nix
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ] || [[ "$1" == -* ]]; then
+    echo "Regenerates the Yarn dependency lock files"
+    echo "Usage: $0 <git release tag>"
+    exit 1
+fi
+
+scratch=$(mktemp -d)
+function finish {
+  rm -rf "$scratch"
+}
+trap finish EXIT
+
+# Prefetch sources
+URL="https://github.com/radicle-dev/radicle-upstream/archive/$1.tar.gz"
+output=$(nix-prefetch-url --print-path "$URL")
+sha256=$(echo $output | cut -d ' ' -f 1)
+tarball=$(echo $output | cut -d ' ' -f 2)
+
+# Top-level package
+echo "{\"url\": \"$URL\", \"sha256\": \"$sha256\"}" | jq > src.json
+
+# Create yarn2nix files
+tar -xf "$tarball" -C $scratch --strip 1
+cp $scratch/package.json radicle-upstream-package.json
+yarn2nix --lockfile="$scratch/yarn.lock" > radicle-upstream-yarndeps.nix
+
+# Create package for proxy
+crate2nix generate -n ../../../../.. -f $scratch/proxy/Cargo.toml -o Cargo.nix
