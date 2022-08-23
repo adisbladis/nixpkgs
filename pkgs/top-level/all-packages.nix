@@ -22220,6 +22220,12 @@ with pkgs;
 
   go2nix = callPackage ../development/tools/go2nix { };
 
+  gomod2nix = let
+    builder = callPackage ../build-support/go/gomod2nix { };
+  in callPackage (import ../development/tools/gomod2nix { inherit lib fetchFromGitHub; }) {
+    inherit (builder) buildGoApplication mkGoEnv;
+  };
+
   leaps = callPackage ../development/tools/leaps { };
 
   vgo2nix = callPackage ../development/tools/vgo2nix { };
