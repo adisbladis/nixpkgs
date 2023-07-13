@@ -25,7 +25,13 @@ let
     };
     sharp = {
       nativeBuildInputs = [ pkg-config nodePackages.semver ];
-      buildInputs = [ vips ];
+      buildInputs = [
+        # Build vips without imagemagick support to prevent
+        # "Input buffer contains unsupported image format"
+        (vips.override {
+          imagemagick = null;
+        })
+      ];
       postInstall = ''
         yarn --offline run install
       '';
