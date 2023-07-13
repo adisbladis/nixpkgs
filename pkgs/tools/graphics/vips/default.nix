@@ -106,7 +106,8 @@ stdenv.mkDerivation rec {
     "-Dnifti=disabled"
   ] ++ lib.optionals (!stdenv.isDarwin) [
     "-Dgtk_doc=true"
-  ];
+  ] ++ lib.optional (imagemagick == null) "-Dmagick=disabled"
+  ;
 
   meta = with lib; {
     changelog = "https://github.com/libvips/libvips/blob/${src.rev}/ChangeLog";
