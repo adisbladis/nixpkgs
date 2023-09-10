@@ -19,8 +19,9 @@ let
   };
 in
 
-stdenv.mkDerivation (finalAttrs: ({
-  name = "emacs-${pname}-${finalAttrs.version}";
+stdenv.mkDerivation ({
+  pname = "emacs-${pname}";
+  inherit version;
 
   unpackCmd = ''
     case "$curSrc" in
@@ -83,4 +84,4 @@ stdenv.mkDerivation (finalAttrs: ({
   '';
 }
 
-// removeAttrs args [ "buildInputs" "packageRequires" "meta" ]))
+// removeAttrs args [ "buildInputs" "packageRequires" "meta" ])
