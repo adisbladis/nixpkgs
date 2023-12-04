@@ -60,16 +60,19 @@ buildPythonPackage rec {
     pygobject3
   ];
 
-  doCheck = false; # ERROR: No such build data file as '/build/dbus-python-1.3.2/meson-private/build.dat'.
+  pypaBuildFlags = [
+    # Don't discard meson build directory.
+    "-Cbuild-dir=_meson-build"
+  ];
+
+  doCheck = true; # ERROR: No such build data file as '/build/dbus-python-1.3.2/meson-private/build.dat'.
 
   checkPhase = ''
     runHook preCheck
-
     dbus-run-session \
       --config-file=${dbus}/share/dbus-1/session.conf \
-        meson test \
+        meson test --no-rebuild -C _meson-build \
           --print-errorlogs
-
     runHook postCheck
   '';
 
