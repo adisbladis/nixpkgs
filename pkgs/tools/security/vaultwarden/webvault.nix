@@ -4,6 +4,7 @@
 , git
 , nixosTests
 , python3
+, vaultwarden
 }:
 
 let
@@ -63,12 +64,12 @@ in buildNpmPackage rec {
     tests = nixosTests.vaultwarden;
   };
 
-  meta = with lib; {
+  meta = {
     description = "Integrates the web vault into vaultwarden";
     homepage = "https://github.com/dani-garcia/bw_web_builds";
     changelog = "https://github.com/dani-garcia/bw_web_builds/releases/tag/v${version}";
-    platforms = platforms.all;
-    license = licenses.gpl3Plus;
+    platforms = lib.platforms.all;
+    license = lib.licenses.gpl3Plus;
     inherit (vaultwarden.meta) maintainers;
   };
 }
