@@ -310,7 +310,7 @@ class Logger:
 
 
 
-def auto_patchelf_file(logger: Logger, path: Path, runtime_deps: list[Path], append_rpaths: list[Path] = [], keep_libc: bool = False, preserve_origin: bool = False, extra_args: list[str] = []) -> list[Dependency]:
+def auto_patchelf_file(logger: Logger, path: Path, runtime_deps: list[Path], append_rpaths: list[Path] = [], keep_libc: bool = False, preserve_origin: bool = False, set_interpreter: bool = True, extra_args: list[str] = []) -> list[Dependency]:
     try:
         with open_elf(path) as elf:
 
@@ -349,7 +349,7 @@ def auto_patchelf_file(logger: Logger, path: Path, runtime_deps: list[Path], app
     keep_libc |= file_osabi in ('ELFOSABI_FREEBSD', 'ELFOSABI_OPENBSD')
 
     rpath = []
-    if file_is_dynamic_executable:
+    if file_is_dynamic_executable and set_interpreter:
         logger.log(SetInterpreter(file=path, interpreter_path=interpreter_path))
         subprocess.run(
                 ["patchelf", "--set-interpreter", interpreter_path.as_posix(), path.as_posix()] + extra_args,
@@ -448,6 +448,7 @@ def auto_patchelf(
         keep_libc: bool = False,
         preserve_origin: bool = False,
         add_existing: bool = True,
+        set_interpreter: bool = True,
         extra_args: list[str] = []) -> None:
 
     if not paths_to_patch:
@@ -463,7 +464,7 @@ def auto_patchelf(
     dependencies = []
     for path in chain.from_iterable(glob(p, '*', recursive) for p in paths_to_patch):
         if not path.is_symlink() and path.is_file():
-            dependencies += auto_patchelf_file(logger, path, runtime_deps, append_rpaths, keep_libc, preserve_origin, extra_args)
+            dependencies += auto_patchelf_file(logger, path, runtime_deps, append_rpaths, keep_libc, preserve_origin, set_interpreter, extra_args)
 
     missing = [dep for dep in dependencies if not dep.found]
 
@@ -561,6 +562,11 @@ def main() -> None:
         help="Output events as JSON Lines to stdout instead of human-readable diagnostics.",
     )
     parser.add_argument(
+        "--no-set-interpreter",
+        action="store_true",
+        help="Don't set ELF interpreter path.",
+    )
+    parser.add_argument(
         "--extra-args",
         # Undocumented Python argparse feature: consume all remaining arguments
         # as values for this one. This means this argument should always be passed
@@ -587,6 +593,7 @@ def main() -> None:
         keep_libc=args.keep_libc,
         preserve_origin=args.preserve_origin,
         add_existing=args.add_existing,
+        set_interpreter=not args.no_set_interpreter,
         extra_args=args.extra_args)
 
 
