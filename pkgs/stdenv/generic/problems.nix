@@ -136,10 +136,14 @@ rec {
   ];
 
   genAutomaticProblems =
-    config: attrs:
+    config:
+    let
+      conditions = map (problem: problem // { condition = problem.condition config; }) automaticProblems;
+    in
+    attrs:
     listToAttrs (
       map (problem: lib.nameValuePair problem.kindName problem.value) (
-        filter (problem: problem.condition config attrs) automaticProblems
+        filter (problem: problem.condition attrs) conditions
       )
     );
 
@@ -463,6 +467,8 @@ rec {
         definedConstraints
         ;
 
+      genAutomaticProblems' = genAutomaticProblems config;
+
       # All the problem kinds that actually need to be checked
       configuredProblems = definedConstraints.kinds ++ definedConstraints.names;
 
@@ -497,7 +503,7 @@ rec {
       # Slow path, only here we actually figure out which problems we need to handle
       let
         pname = getName attrs;
-        problems = attrs.meta.problems or { } // genAutomaticProblems config attrs;
+        problems = attrs.meta.problems or { } // genAutomaticProblems' attrs;
         problemsToHandle = filter (v: v.handler != "ignore") (
           mapAttrsToList (name: problem: rec {
             inherit name;
